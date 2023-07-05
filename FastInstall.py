@@ -1,10 +1,15 @@
 import os
 import time
 import logging
+import zipfile
+import shutil
 from tkinter import *
 import windnd
 import tkinter.scrolledtext as ScrolledText
 import threading
+import random
+import json
+from copy import deepcopy
 
 # 打包指令 pyinstaller -F -w FastInstall.py
 
@@ -15,6 +20,217 @@ import threading
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s: %(message)s')
 
 devices = []  # 当前连接设备
+
+
+class DefaultCheck:
+    def __init__(self, file_path):
+        self.file_path = file_path
+
+    lang_path = ['math_config_ar.json', 'math_config_en.json', 'math_config_es.json', 'math_config_fr.json',
+                 'math_config_id.json', 'math_config_ja.json', 'math_config_ko.json', 'math_config_pt.json',
+                 'math_config_ru.json', 'math_config_th.json', 'math_config_vi.json', 'math_config_zht.json']
+    path_config = {
+        "apk": {"image_path": "/assets/package_config/images/", "package_config_path": "/assets/package_config/",
+                "default_game_path": "/assets/res/subModules/default_game.json"},
+        "ipa": {"image_path": "/Payload/2d_noSuper_education.app/Images",
+                "package_config_path": "/Payload/2d_noSuper_education.app/PackageConfig/",
+                "default_game_path": "/Payload/2d_noSuper_education.app/res/subModules/default_game.json"},
+        "aab": {"image_path": "/base/assets/package_config/images/",
+                "package_config_path": "/base/assets/package_config/",
+                "default_game_path": "/base/assets/res/subModules/default_game.json"}}
+    # 解压目录，保存在相对路径
+    path_cache = "/zip_cache_" + str(int(time.time()))
+    # state：-1 失败，0 成功。文件默认不存在
+    result = {"state": -1,
+              "message": "失败",
+              "data": {"image": {"state": -1, "data": 0, "message": ""},
+                       "package_config_zh": {"state": -1, "message": "文件不存在", "data": []},
+                       "package_config_lang": {"state": -1, "message": "文件不存在", "file_count": 0, "random_file": "",
+                                               "data": []},
+                       "default_game": {"state": -1, "message": "文件不存在", "data": []}}}
+
+    def file_format(self):
+        """判断文件格式"""
+        file_format = [".apk", ".ipa", ".aab"]
+        for f in file_format:
+            if self.file_path.endswith(f):
+                return f.replace(".", "")
+        return False
+
+    def zip_file(self):
+        """解压文件"""
+        # 创建 ZipFile 实例对象
+        zip_file = zipfile.ZipFile(self.file_path)
+        # 创建目录
+        os.mkdir(self.path_cache)
+        # 提取 zip 文件
+        zip_file.extractall(self.path_cache)
+        # 关闭 zip 文件
+        zip_file.close()
+
+    def delete_file(self):
+        """删除解压后的文件"""
+        shutil.rmtree(self.path_cache)
+
+    def extract_json_data(self, path):
+        """读取文件数据"""
+        if self.file_exists(self.path_cache + path):  # 先判断文件存在且不为空
+            with open(self.path_cache + path, "r", encoding="utf-8") as default_file:
+                data = json.load(default_file)
+            return data
+        else:
+            return {}
+
+    @staticmethod
+    def count_files(dir_path: str, extension: str):
+        """判断文件夹内某个后缀的文件有多少个"""
+        if os.path.isdir(dir_path):
+            files = os.listdir(dir_path)
+            count_files = [file for file in files if file.endswith('.' + extension)]
+            logging.debug("文件内文件数量：" + extension + "：" + str(len(count_files)))
+            return len(count_files)
+        else:
+            logging.debug("文件目录不存在")
+            return -1
+
+    @staticmethod
+    def file_exists(file_path: str):
+        """判断文件存在并且不为空"""
+        return os.path.exists(file_path) and os.stat(file_path).st_size > 0
+
+    @staticmethod
+    def package_config_check(data, is_lang=False):
+        """判断默认数据是否正常"""
+        package_config_check_result = []
+        # grade=0，为体验岛没有选择阶段的课程
+        level_0_result = {"level": "0", "count": {"0": 0, "1": 0, "2": 0, "3": 0, "4": 0}, "error": []}
+        level_result = {"level": "", "count": 0, "error": []}
+        for level in data["areaData"]:
+            if level["style"]["fieldData"]["level"] == "0":
+                level_0_result_copy = deepcopy(level_0_result)
+                for grade in level["data"]:
+                    level_0_result_copy["count"][grade['fieldData']["grade"]] += 1
+                    if is_lang:
+                        if any(t["type"] == "mv" for t in grade["fieldData"]["stepConfig"]):
+                            level_0_result_copy["error"].append(
+                                {"areaDataID": grade["areaDataID"], "id": grade["id"], "title": grade["title"],
+                                 "packageIdent": grade["fieldData"]["packageIdent"],
+                                 "lang": grade["fieldData"]["lang"], "grade": grade["fieldData"]["grade"]})
+                package_config_check_result.append(level_0_result_copy)
+            else:
+                level_result_copy = deepcopy(level_result)
+                level_result_copy["level"] = level["style"]["fieldData"]["level"]
+                for lesson in level["data"]:
+                    level_result_copy["count"] += 1
+                    if is_lang:
+                        if any(t["type"] == "mv" for t in lesson["fieldData"]["stepConfig"]):
+                            level_result_copy["error"].append(
+                                {"areaDataID": lesson["areaDataID"], "id": lesson["id"], "title": lesson["title"],
+                                 "packageIdent": lesson["fieldData"]["packageIdent"],
+                                 "lang": lesson["fieldData"]["lang"]})
+                package_config_check_result.append(level_result_copy)
+
+        return list(package_config_check_result)
+
+    @staticmethod
+    def result_state(result):
+        message = ""
+        check = 0
+        level_0 = -1  # 判断体验岛是否存在
+        for l in result:
+            if l["level"] == "0":
+                level_0 += 1
+                for key, value in l["count"].items():
+                    if value == 0 and key != "0":
+                        check -= 1
+                        message += "【体验岛" + key + "阶段没有课程】"
+            else:
+                if l["count"] <= 0:
+                    check -= 1
+                    message += "【level" + l["level"] + "没有课程】"
+            if l["error"]:
+                check -= 1
+                message += "【level" + l["level"] + "国际化下存在MV环节】"
+        if level_0 == -1:
+            check -= 1
+            message += "【体验岛不存在】"
+        if len(result) <= 3:
+            check -= 1
+            message += "【只有" + str(len(result)) + "个level，检查数量】"
+        state = -1 if check < 0 else 0
+        return state, message
+
+    @staticmethod
+    def final_result(result):
+        state_all = result["data"]["image"]["state"] + result["data"]["package_config_zh"]["state"] + \
+                    result["data"]["package_config_lang"]["state"] + result["data"]["default_game"]["state"]
+        state = -1 if state_all < 0 else 0
+        message = result["data"]["image"]["message"] + result["data"]["package_config_zh"]["message"] + \
+                  result["data"]["package_config_lang"]["message"] + result["data"]["default_game"]["message"]
+        return state, message
+
+    def main(self):
+        logging.debug("判断文件格式")
+        file_format = self.file_format()
+        if not file_format:
+            self.result["message"] = "文件格式错误"
+            return self.result
+
+        logging.debug("解压文件")
+        self.zip_file()
+
+        # 组合需要的文件地址
+        image_path_path = self.path_config[file_format]["image_path"]
+        package_config_zh_path = self.path_config[file_format][
+                                     "package_config_path"] + 'math_config_zh.json'
+        package_config_lang_path = self.path_config[file_format][
+                                       "package_config_path"] + random.choice(self.lang_path)
+        default_game_md5_path = self.path_config[file_format]["default_game_path"]
+
+        logging.debug("判断图片文件是否存在")
+        image_png = self.count_files(self.path_cache + image_path_path, "png")  # 判断默认图片是否存在
+        if image_png >= 0:
+            self.result["data"]["image"].update({"data": image_png, "state": 0})
+
+        logging.debug("提取文件数据")
+        package_config_zh_data = self.extract_json_data(package_config_zh_path)
+
+        default_game_md5_data = self.extract_json_data(default_game_md5_path)
+
+        if package_config_zh_data:
+            package_config_zh_result = self.package_config_check(package_config_zh_data)
+            state, message = self.result_state(package_config_zh_result)
+            self.result["data"]["package_config_zh"]["data"] = package_config_zh_result
+            self.result["data"]["package_config_zh"]["state"] = state
+            self.result["data"]["package_config_zh"]["message"] = message
+        if file_format == "apk":
+            self.result["data"]["package_config_lang"]["state"] = 0
+            self.result["data"]["package_config_lang"]["message"] = "apk不判断海外内置文件"
+        else:
+            package_config_lang_data = self.extract_json_data(package_config_lang_path)
+            if package_config_lang_data:
+                package_config_lang_result = self.package_config_check(package_config_lang_data, is_lang=True)
+                state, message = self.result_state(package_config_lang_result)
+                self.result["data"]["package_config_lang"]["state"] = state
+                self.result["data"]["package_config_lang"]["message"] = message
+                self.result["data"]["package_config_lang"]["file_count"] = self.count_files(
+                    self.path_cache + self.path_config[file_format]["package_config_path"], "json")
+                self.result["data"]["package_config_lang"]["random_file"] = package_config_lang_path.split("/")[-1]
+                self.result["data"]["package_config_lang"]["data"] = package_config_lang_result
+
+        if default_game_md5_data:
+            self.result["data"]["default_game"]["data"] = default_game_md5_data["item"]
+            self.result["data"]["default_game"]["state"] = 0
+            self.result["data"]["default_game"]["message"] = ""
+        logging.debug("编辑结果")
+        state, message = self.final_result(self.result)
+        self.result["state"] = state
+        self.result["message"] = message
+
+        logging.debug("删除解压文件缓存")
+        self.delete_file()
+        logging.debug(json.dumps(self.result))
+        return self.result
 
 
 # 获取devices数量和名称
@@ -58,14 +274,14 @@ def get_packages_list(device):
 
 def get_adress(adress):
     adress_list = []
-    logging.debug("正在安装的APK目录：" + adress)
+    logging.debug("正在处理的目录：" + adress)
     if os.path.isdir(adress):
         for f in os.listdir(adress):
             # 只装apk
-            if ".apk" in f:
+            if ".apk" in f or ".ipa" in f or ".aab" in f:
                 adress_list.append('{}/{}'.format(adress, f))
     else:
-        adress_list = [item for item in adress.split("\n") if ".apk" in item]
+        adress_list = [item for item in adress.split("\n") if ".apk" in item or ".ipa" in item or ".aab" in item]
     return adress_list
 
 
@@ -162,13 +378,16 @@ def task_clear():
     task_list_observer.notify()  # 通知任务列表已更新
 
 
-def task_control(path, device, status="未开始", app_id=None, tast_id=0, commend=[]):
+def task_control(path="", device="", status="未开始", app_id=None, tast_id=0, commend=[], log=None):
     """
-    用于更新任务列表task_list数据，模板{"序号": 0, "状态": status, "设备": device, "设备ID": device, "文件": path, "操作": [],"app_id"：“”}
+    用于更新任务列表task_list数据，模板{"序号": 0, "状态": status, "设备": device, "设备ID": device, "文件": path, "操作": [],"app_id"：“”，log：None}
     :param path:文件路径
     :param device: 设备ID
     :param status: 完成状态
     :param tast_id: 任务ID
+    :param app_id: 应用包名
+    :param commend: 操作按钮
+    :param log: 日志
     :return:返回任务ID
     """
     global task_list, devices
@@ -176,12 +395,12 @@ def task_control(path, device, status="未开始", app_id=None, tast_id=0, comme
     if tast_id == 0:
         tast_id = len(task_list) + 1
         task_list.insert(0, {"序号": tast_id, "状态": status, "设备": device_name, "设备ID": device, "文件": path, "操作": commend,
-                             "app_id": app_id})
+                             "app_id": app_id, "log": log})
     else:
         for i in range(len(task_list)):
             if task_list[i]["序号"] == tast_id:
                 task_list[i] = {"序号": tast_id, "状态": status, "设备": device_name, "设备ID": device, "文件": path,
-                                "操作": commend, "app_id": app_id}
+                                "操作": commend, "app_id": app_id, "log": log}
 
     task_list_observer.notify()  # 通知任务列表已更新
     return tast_id
@@ -202,7 +421,7 @@ class InstallApp:
         self.massage_label = Label(self.top_frame, text="提示区域", width=30, font="微软雅黑 15 bold")
         self.massage_label.grid(row=0, column=0, columnspan=2)
 
-        # 左边区域==============================================================
+        # 左边-上边区域==============================================================
         self.install_frame = Frame(self.init_window_name)
         self.install_frame.grid(row=1, column=0, sticky="N")
 
@@ -220,6 +439,8 @@ class InstallApp:
         # 文件地址区域-------------------------------------------------------------
         self.file_path_frame = LabelFrame(self.install_frame, text="文件地址：")
         self.file_path_frame.grid(row=1, column=0)
+        self.file_label = Label(self.file_path_frame, text="（将文件拖入窗口任意位置即可获取文件地址）")
+        self.file_label.grid(row=0, column=0, sticky="W")
         # 文本框清空按钮
         self.clear_button = Button(self.file_path_frame, text="清空", height=1, width=10, command=self.text_clear)
         self.clear_button.grid(row=0, column=0, sticky="E")
@@ -227,8 +448,9 @@ class InstallApp:
         self.file_path_text = Text(self.file_path_frame, width=61, height=4)
         self.file_path_text.grid(row=1, column=0, padx=5, pady=5, ipadx=5, ipady=5)
 
+        # 右边-上边区域==============================================================
         # 设备选择区域-------------------------------------------------------------
-        self.devices_frame = LabelFrame(self.install_frame, text="设备选择：", width=66)
+        self.devices_frame = LabelFrame(self.install_frame, text="设备选择：（不选默认所有）", width=66)
         self.devices_frame.grid(row=0, column=1, sticky="E", padx=10)
         # 设备复选框
         self.checkboxes = {}
@@ -243,11 +465,11 @@ class InstallApp:
         self.button_frame = Frame(self.install_frame)
         self.button_frame.grid(row=1, column=1, padx=10, pady=10)
         # 开始按钮
-        self.install_button = Button(self.button_frame, text="所有设备上安装", width=22,
-                                     command=lambda: self.thread_it(self.run, "all"))
+        self.install_button = Button(self.button_frame, text="核验思维默认数据", width=22,
+                                     command=lambda: self.thread_it(self.default_check))
         self.install_button.grid(row=0, column=0, padx=10)
-        self.install_button = Button(self.button_frame, text="选中设备上安装", width=22,
-                                     command=lambda: self.thread_it(self.run, "select"))
+        self.install_button = Button(self.button_frame, text="安装", width=22,
+                                     command=lambda: self.thread_it(self.run))
         self.install_button.grid(row=0, column=1, padx=10)
 
         self.choose_devices_frame = LabelFrame(self.button_frame, text="选中设备上操作：")
@@ -262,7 +484,7 @@ class InstallApp:
         self.delete_button = Button(self.choose_devices_frame, text="清空思维", width=22,
                                     command=lambda: self.thread_it(self.clear_commend))
         self.delete_button.grid(row=0, column=2, pady=5)
-        # 右边区域==============================================================
+        # 下方区域==============================================================
         self.log_frame = LabelFrame(self.init_window_name, text="任务列表：")
         self.log_frame.grid(row=2, column=0, padx=15, columnspan=2)
         self.task_label = Label(self.log_frame, text="（单击文件地址可复制）")
@@ -273,11 +495,14 @@ class InstallApp:
 
         self.task_canvas = Canvas(self.log_frame, width=self.width - 80, height=200, bg="white")
         self.task_canvas.grid(row=1, column=0, padx=5, columnspan=2)
-        # 绘制标题
         self.task_canvas_header = {"序号": 60, "状态": 120, "设备": 200, "文件": 550, "操作": 900}
-        for key, value in self.task_canvas_header.items():
-            self.task_canvas.create_text(value, 20, text=key, anchor="center")
+
+        # 绘制标题
+        # self.task_canvas_header = {"序号": 60, "状态": 120, "设备": 200, "文件": 550, "操作": 900}
+        # for key, value in self.task_canvas_header.items():
+        #     self.task_canvas.create_text(value, 20, text=key, anchor="center")
         self.y = 20
+        self.add_canvas()
         # 设置滚动区域
         self.task_canvas.configure(scrollregion=self.task_canvas.bbox("all"))
         # 添加滚动条
@@ -288,7 +513,6 @@ class InstallApp:
         # 任务列表有变化时，刷新列表
         task_list_observer.register(self.add_canvas)
 
-        # 右边-下方区域==============================================================
         # 继续按钮
         self.continue_button = Button(self.log_frame, text="批量任务继续进行", height=1, width=20, command=self.is_continue)
         self.isContinue = False
@@ -314,16 +538,17 @@ class InstallApp:
 
     def add_canvas(self):
         global task_list
-        print("任务列表：", task_list)
         self.task_canvas.delete("all")
+        self.y = 20  # 标题高度
         for key, value in self.task_canvas_header.items():
-            self.task_canvas.create_text(value, 20, text=key, anchor="center")
-        self.y = 20
+            self.task_canvas.create_text(value, self.y, text=key, anchor="center")
         for i in task_list:
             a1 = -(-len(i['文件']) // 86)
             self.y = self.y + 30 + a1 * 3
             if '成功' in i['状态']:
                 fill_color = 'green'
+            elif '失败' in i['状态']:
+                fill_color = 'red'
             else:
                 fill_color = 'black'
             self.task_canvas.create_text(self.task_canvas_header["序号"], self.y, text=i['序号'])
@@ -338,10 +563,81 @@ class InstallApp:
             self.task_canvas.create_window(self.task_canvas_header['操作'] - 20, self.y, window=retry_button)
 
             for b in i['操作']:
-                button = Button(self.task_canvas, text=b, command=lambda i2=i: self.open_commend(i2))
-                self.task_canvas.create_window(self.task_canvas_header['操作'] + 20, self.y, window=button)
-
+                if b == "打开":
+                    button = Button(self.task_canvas, text=b, command=lambda i2=i: self.open_commend(i2))
+                    self.task_canvas.create_window(self.task_canvas_header['操作'] + 20, self.y, window=button)
+                elif b == "日志":
+                    button = Button(self.task_canvas, text=b, command=lambda i2=i: self.show_log(i2))
+                    self.task_canvas.create_window(self.task_canvas_header['操作'] + 20, self.y, window=button)
             self.task_canvas.configure(scrollregion=self.task_canvas.bbox("all"))
+
+    def show_log(self, task):
+        def state_str(state):
+            if state == 0:
+                return "成功"
+            else:
+                return "失败"
+
+        def level_conunt_text(count):
+            for i in count:
+                if i["level"] == "0":
+                    level_o_str = {"0": "未选阶段课程", "1": "未入园", "2": "小班", "3": "中班", "4": "大班"}
+                    log_text.insert("end", "体验岛阶段课程数量：" + "\n", "标题")
+                    for key, value in i["count"].items():
+                        log_text.insert("end", level_o_str[key] + ":" + str(value) + "\n")
+                else:
+                    log_text.insert("end", "阶段" + i["level"] + "：课程数量 " + str(i["count"]) + "\n")
+
+                if i["error"]:
+                    log_text.insert("end", "海外存在MV环节的课程：" + str(i["error"]) + "\n")
+                log_text.insert("end", "-" * 20 + "\n", "标题")
+
+        log = task["log"]
+        # 创建一个新的Toplevel窗口
+        log_top = Toplevel()
+        log_top.title("Log")
+
+        # 在窗口中创建一个文本框来显示日志内容
+        log_text = Text(log_top, font="微软雅黑 10 bold")
+        log_text.pack()
+        # 设置文本和样式
+        log_text.tag_configure("标题", foreground="blue")
+        log_text.tag_configure("成功", foreground="green")
+        log_text.tag_configure("失败", foreground="red")
+
+        log_text.insert("1.0", "========总状态========\n", "标题")
+        log_text.insert("end", "核验状态：" + state_str(log["state"]), state_str(log["state"]))
+        log_text.insert("end", "   信息：" + log["message"] + "\n")
+
+        log_text.insert("end", "========默认图片========\n", "标题")
+        log_text.insert("end", "核验状态：" + state_str(log["data"]["image"]["state"]),
+                        state_str(log["data"]["image"]["state"]))
+        log_text.insert("end", "  信息：" + log["data"]["image"]["message"] + "  图片数量：" + str(
+            log["data"]["image"]["data"]) + "\n")
+
+        log_text.insert("end", "========默认子包========\n", "标题")
+        log_text.insert("end", "核验状态：" + state_str(log["data"]["default_game"]["state"]),
+                        state_str(log["data"]["default_game"]["state"]))
+        log_text.insert("end", "  信息：" + log["data"]["default_game"]["message"] + "  默认子包信息：" + str(
+            log["data"]["default_game"]["data"]) + "\n")
+
+        log_text.insert("end", "========首页默认数据（简体中文）========\n", "标题")
+        log_text.insert("end", "核验状态：" + state_str(log["data"]["package_config_zh"]["state"]),
+                        state_str(log["data"]["package_config_zh"]["state"]))
+        log_text.insert("end", "   信息：" + log["data"]["package_config_zh"]["message"] + "\n")
+        level_conunt_text(log["data"]["package_config_zh"]["data"])
+
+        log_text.insert("end", "========首页默认数据（国际化语言）========\n", "标题")
+        package_config_lang = log["data"]["package_config_lang"]
+        log_text.insert("end", "核验状态：" + state_str(package_config_lang["state"]),
+                        state_str(package_config_lang["state"]))
+        log_text.insert("end", "   信息：" + package_config_lang["message"] + "\n")
+        if package_config_lang["file_count"] and package_config_lang["random_file"]:
+            log_text.insert("end", "总文件数量：" + str(package_config_lang["file_count"]) + "   " + "抽取的国际化文件：" +
+                            package_config_lang["random_file"] + "\n")
+            level_conunt_text(package_config_lang["data"])
+
+        log_text.configure(state="disabled")
 
     def clone_task(self, task):
         if '安装' in task['状态']:
@@ -355,6 +651,13 @@ class InstallApp:
         elif '清空' in task['状态']:
             self.thread_it(clear_app, task['设备ID'], "com.sinyee.babybus.mathIII")
             task_control("com.sinyee.babybus.mathIII", task['设备ID'], "清空思维")
+        elif '核验' in task['状态']:
+            tast_id = task_control(task['文件'], "", "核验包数据")
+            result = DefaultCheck(task['文件']).main()
+            if result["state"] == 0:
+                task_control(tast_id=tast_id, path=task['文件'], device="", status="核验包成功", log=result, commend=["日志"])
+            elif result["state"] == -1:
+                task_control(tast_id=tast_id, path=task['文件'], device="", status="核验包失败", log=result, commend=["日志"])
 
     def devices_checkbutton(self):
         # 构建复选框
@@ -375,11 +678,15 @@ class InstallApp:
                 self.devices_button.append(c)
 
     def devices_checkbutton_get(self):
-        # 获取复选框选中数据
+        # 获取复选框选中数据，不选默认所有
         select_devices = []
+        devices_all = []
         for i in self.checkboxes:
             if self.checkboxes[i].get():
                 select_devices.append(self.devices[i][0])
+            devices_all.append(self.devices[i][0])
+        if not select_devices:
+            select_devices = devices_all
         return select_devices
 
     def debug_commend(self):
@@ -409,18 +716,29 @@ class InstallApp:
         else:
             self.massage_label.config(text="没有选中设备")
 
-    def run(self, devices_mode):
+    def default_check(self):
+
+        file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
+        file_list = get_adress(file_path_data)
+
+        for index, f in enumerate(file_list):
+            tast_id = task_control(f, "", "核验包数据")
+            result = DefaultCheck(f).main()
+            self.massage_label.config(text="检测默认数据，第" + str(index + 1) + "个安装包开始")
+            if result["state"] == 0:
+                task_control(tast_id=tast_id, path=f, device="", status="核验包成功", log=result, commend=["日志"])
+            elif result["state"] == -1:
+                task_control(tast_id=tast_id, path=f, device="", status="核验包失败", log=result, commend=["日志"])
+        self.massage_label.config(text="检测默认数据完成")
+
+    def run(self):
         file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
         if len(file_path_data) <= 0:
             self.massage_label.config(text="请填写正确文件路径")
         elif not self.devices:
             self.massage_label.config(text="当前没有连接的设备")
         else:
-            if devices_mode == "select":
-                select_devices = self.devices_checkbutton_get()
-            else:
-                select_devices = [d[0] for d in self.devices]
-
+            select_devices = self.devices_checkbutton_get()
             file_list = get_adress(file_path_data)
             app_key = None
             for index, f in enumerate(file_list):
