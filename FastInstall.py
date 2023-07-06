@@ -194,8 +194,8 @@ class DefaultCheck:
 
         logging.debug("提取文件数据")
         package_config_zh_data = self.extract_json_data(package_config_zh_path)
-
         default_game_md5_data = self.extract_json_data(default_game_md5_path)
+        package_config_lang_data = self.extract_json_data(package_config_lang_path)
 
         if package_config_zh_data:
             package_config_zh_result = self.package_config_check(package_config_zh_data)
@@ -203,20 +203,20 @@ class DefaultCheck:
             self.result["data"]["package_config_zh"]["data"] = package_config_zh_result
             self.result["data"]["package_config_zh"]["state"] = state
             self.result["data"]["package_config_zh"]["message"] = message
-        if file_format == "apk":
-            self.result["data"]["package_config_lang"]["state"] = 0
-            self.result["data"]["package_config_lang"]["message"] = "apk不判断海外内置文件"
-        else:
-            package_config_lang_data = self.extract_json_data(package_config_lang_path)
-            if package_config_lang_data:
-                package_config_lang_result = self.package_config_check(package_config_lang_data, is_lang=True)
+
+        if package_config_lang_data:
+            package_config_lang_result = self.package_config_check(package_config_lang_data, is_lang=True)
+            self.result["data"]["package_config_lang"]["file_count"] = self.count_files(
+                self.path_cache + self.path_config[file_format]["package_config_path"], "json")
+            self.result["data"]["package_config_lang"]["random_file"] = package_config_lang_path.split("/")[-1]
+            self.result["data"]["package_config_lang"]["data"] = package_config_lang_result
+            if file_format == "apk":
+                self.result["data"]["package_config_lang"]["state"] = 0
+                self.result["data"]["package_config_lang"]["message"] = "apk不判断海外内置文件"
+            else:
                 state, message = self.result_state(package_config_lang_result)
                 self.result["data"]["package_config_lang"]["state"] = state
                 self.result["data"]["package_config_lang"]["message"] = message
-                self.result["data"]["package_config_lang"]["file_count"] = self.count_files(
-                    self.path_cache + self.path_config[file_format]["package_config_path"], "json")
-                self.result["data"]["package_config_lang"]["random_file"] = package_config_lang_path.split("/")[-1]
-                self.result["data"]["package_config_lang"]["data"] = package_config_lang_result
 
         if default_game_md5_data:
             self.result["data"]["default_game"]["data"] = default_game_md5_data["item"]
@@ -571,7 +571,8 @@ class InstallApp:
                     self.task_canvas.create_window(self.task_canvas_header['操作'] + 20, self.y, window=button)
             self.task_canvas.configure(scrollregion=self.task_canvas.bbox("all"))
 
-    def show_log(self, task):
+    @staticmethod
+    def show_log(task):
         def state_str(state):
             if state == 0:
                 return "成功"
@@ -723,8 +724,8 @@ class InstallApp:
 
         for index, f in enumerate(file_list):
             tast_id = task_control(f, "", "核验包数据")
+            self.massage_label.config(text="检测默认数据，第" + str(index + 1) + "个安装包")
             result = DefaultCheck(f).main()
-            self.massage_label.config(text="检测默认数据，第" + str(index + 1) + "个安装包开始")
             if result["state"] == 0:
                 task_control(tast_id=tast_id, path=f, device="", status="核验包成功", log=result, commend=["日志"])
             elif result["state"] == -1:
@@ -792,7 +793,7 @@ class InstallApp:
 
 def gui_start():
     init_window = Tk()  # 实例化出一个父窗口
-    set_window = InstallApp(init_window)
+    InstallApp(init_window)
     init_window.mainloop()
 
 
