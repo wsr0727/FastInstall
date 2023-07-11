@@ -17,7 +17,7 @@ from copy import deepcopy
 快速安卓启动卸载
 '''
 # 日志设置
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s: %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
 
 devices = []  # 当前连接设备
 
@@ -43,11 +43,11 @@ class DefaultCheck:
     # state：-1 失败，0 成功。文件默认不存在
     result = {"state": -1,
               "message": "失败",
-              "data": {"image": {"state": -1, "data": 0, "message": ""},
-                       "package_config_zh": {"state": -1, "message": "文件不存在", "data": []},
-                       "package_config_lang": {"state": -1, "message": "文件不存在", "file_count": 0, "random_file": "",
-                                               "data": []},
-                       "default_game": {"state": -1, "message": "文件不存在", "data": []}}}
+              "data": {"image": {"state": -1, "data": 0, "message": "【默认图片文件不存在】"},
+                       "package_config_zh": {"state": -1, "message": "【简体中文首页数据文件不存在】", "data": []},
+                       "package_config_lang": {"state": -1, "message": "【国际化语言首页数据文件不存在】", "file_count": 0,
+                                               "random_file": "", "data": []},
+                       "default_game": {"state": -1, "message": "【内置子包文件不存在】", "data": []}}}
 
     def file_format(self):
         """判断文件格式"""
@@ -190,7 +190,7 @@ class DefaultCheck:
         logging.debug("判断图片文件是否存在")
         image_png = self.count_files(self.path_cache + image_path_path, "png")  # 判断默认图片是否存在
         if image_png >= 0:
-            self.result["data"]["image"].update({"data": image_png, "state": 0})
+            self.result["data"]["image"].update({"data": image_png, "state": 0, "message": ""})
 
         logging.debug("提取文件数据")
         package_config_zh_data = self.extract_json_data(package_config_zh_path)
@@ -200,32 +200,28 @@ class DefaultCheck:
         if package_config_zh_data:
             package_config_zh_result = self.package_config_check(package_config_zh_data)
             state, message = self.result_state(package_config_zh_result)
-            self.result["data"]["package_config_zh"]["data"] = package_config_zh_result
-            self.result["data"]["package_config_zh"]["state"] = state
-            self.result["data"]["package_config_zh"]["message"] = message
+            self.result["data"]["package_config_zh"].update(
+                {"data": package_config_zh_result, "state": state, "message": message})
 
         if package_config_lang_data:
             package_config_lang_result = self.package_config_check(package_config_lang_data, is_lang=True)
-            self.result["data"]["package_config_lang"]["file_count"] = self.count_files(
-                self.path_cache + self.path_config[file_format]["package_config_path"], "json")
-            self.result["data"]["package_config_lang"]["random_file"] = package_config_lang_path.split("/")[-1]
-            self.result["data"]["package_config_lang"]["data"] = package_config_lang_result
+            file_count = self.count_files(self.path_cache + self.path_config[file_format]["package_config_path"],
+                                          "json")
+            self.result["data"]["package_config_lang"].update(
+                {"file_count": file_count, "random_file": package_config_lang_path.split("/")[-1],
+                 "data": package_config_lang_result})
             if file_format == "apk":
-                self.result["data"]["package_config_lang"]["state"] = 0
-                self.result["data"]["package_config_lang"]["message"] = "apk不判断海外内置文件"
+                self.result["data"]["package_config_lang"].update({"state": 0, "message": "【apk不判断海外内置文件】"})
             else:
                 state, message = self.result_state(package_config_lang_result)
-                self.result["data"]["package_config_lang"]["state"] = state
-                self.result["data"]["package_config_lang"]["message"] = message
+                self.result["data"]["package_config_lang"].update({"state": state, "message": message})
 
         if default_game_md5_data:
-            self.result["data"]["default_game"]["data"] = default_game_md5_data["item"]
-            self.result["data"]["default_game"]["state"] = 0
-            self.result["data"]["default_game"]["message"] = ""
+            self.result["data"]["default_game"].update(
+                {"state": 0, "message": "", "data": default_game_md5_data["item"]})
         logging.debug("编辑结果")
         state, message = self.final_result(self.result)
-        self.result["state"] = state
-        self.result["message"] = message
+        self.result.update({"state": state, "message": message})
 
         logging.debug("删除解压文件缓存")
         self.delete_file()
@@ -292,7 +288,7 @@ def uninstall(device, package_name):
     if 'Success' in uninstall_command[-9:]:
         logging.info("【删除成功】：" + log_info)
     else:
-        logging.error("【删除失败】" + log_info + "\n" + '原因:\n' + uninstall_command)
+        logging.error("【删除失败】" + log_info + "\n原因:\n" + uninstall_command)
 
 
 def luncher_app(device, package_name):
@@ -334,7 +330,7 @@ def clear_app(device, app_key):
 
 
 def run_install(path, devices_list, appkey=None, is_luncher=False):
-    # 安装单个
+    # 卸载、安装、启动、点击协议
     for device in devices_list:
         tast_id = task_control(path, device, "安装进行中")
         if appkey:
@@ -378,7 +374,7 @@ def task_clear():
     task_list_observer.notify()  # 通知任务列表已更新
 
 
-def task_control(path="", device="", status="未开始", app_id=None, tast_id=0, commend=[], log=None):
+def task_control(path="", device="", status="未开始", app_id=None, tast_id=0, commend=None, log=None):
     """
     用于更新任务列表task_list数据，模板{"序号": 0, "状态": status, "设备": device, "设备ID": device, "文件": path, "操作": [],"app_id"：“”，log：None}
     :param path:文件路径
@@ -395,12 +391,12 @@ def task_control(path="", device="", status="未开始", app_id=None, tast_id=0,
     if tast_id == 0:
         tast_id = len(task_list) + 1
         task_list.insert(0, {"序号": tast_id, "状态": status, "设备": device_name, "设备ID": device, "文件": path, "操作": commend,
-                             "app_id": app_id, "log": log})
+                             "app_id": app_id, "日志": log})
     else:
         for i in range(len(task_list)):
             if task_list[i]["序号"] == tast_id:
                 task_list[i] = {"序号": tast_id, "状态": status, "设备": device_name, "设备ID": device, "文件": path,
-                                "操作": commend, "app_id": app_id, "log": log}
+                                "操作": commend, "app_id": app_id, "日志": log}
 
     task_list_observer.notify()  # 通知任务列表已更新
     return tast_id
@@ -561,14 +557,15 @@ class InstallApp:
 
             retry_button = Button(self.task_canvas, text='克隆', command=lambda i2=i: self.clone_task(i2))
             self.task_canvas.create_window(self.task_canvas_header['操作'] - 20, self.y, window=retry_button)
-
-            for b in i['操作']:
-                if b == "打开":
-                    button = Button(self.task_canvas, text=b, command=lambda i2=i: self.open_commend(i2))
-                    self.task_canvas.create_window(self.task_canvas_header['操作'] + 20, self.y, window=button)
-                elif b == "日志":
-                    button = Button(self.task_canvas, text=b, command=lambda i2=i: self.show_log(i2))
-                    self.task_canvas.create_window(self.task_canvas_header['操作'] + 20, self.y, window=button)
+            if i['操作']:
+                for b in i['操作']:
+                    if b == "打开":
+                        button = Button(self.task_canvas, text=b, command=lambda i2=i: self.open_commend(i2))
+                        self.task_canvas.create_window(self.task_canvas_header['操作'] + 20, self.y, window=button)
+                    elif b == "日志":
+                        if i['日志']:
+                            button = Button(self.task_canvas, text=b, command=lambda i2=i: self.show_log(i2))
+                            self.task_canvas.create_window(self.task_canvas_header['操作'] + 20, self.y, window=button)
             self.task_canvas.configure(scrollregion=self.task_canvas.bbox("all"))
 
     @staticmethod
@@ -593,10 +590,10 @@ class InstallApp:
                     log_text.insert("end", "海外存在MV环节的课程：" + str(i["error"]) + "\n")
                 log_text.insert("end", "-" * 20 + "\n", "标题")
 
-        log = task["log"]
+        log = task["日志"]
         # 创建一个新的Toplevel窗口
         log_top = Toplevel()
-        log_top.title("Log")
+        log_top.title("核验默认数据结果")
 
         # 在窗口中创建一个文本框来显示日志内容
         log_text = Text(log_top, font="微软雅黑 10 bold")
@@ -665,6 +662,7 @@ class InstallApp:
         while self.devices_button:
             check_btn = self.devices_button.pop()
             check_btn.destroy()
+        self.checkboxes = {}
         self.devices = get_devices_all()
         if len(self.devices) == 0:
             c = Checkbutton(self.devices_frame, text="无设备连接", state='disabled', width=66)
