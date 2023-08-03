@@ -329,6 +329,12 @@ def clear_app(device, app_key):
     os.popen("adb -s " + device + " shell pm clear " + app_key).read()
 
 
+def setting_debug(device):
+    # 开启语言设置
+    logging.debug("【开启语言设置】：" + device)
+    os.popen("adb -s " + device + " shell am start -a android.settings.LOCALE_SETTINGS").read()
+
+
 def run_install(path, devices_list, appkey=None, is_luncher=False):
     # 卸载、安装、启动、点击协议
     for device in devices_list:
@@ -376,7 +382,8 @@ def task_clear():
 
 def task_control(path="", device="", status="未开始", app_id=None, tast_id=0, commend=None, log=None):
     """
-    用于更新任务列表task_list数据，模板{"序号": 0, "状态": status, "设备": device, "设备ID": device, "文件": path, "操作": [],"app_id"：“”，log：None}
+    用于更新任务列表task_list数据。
+    模板{"序号": 0, "状态": status, "设备": device, "设备ID": device, "文件": path, "操作": [],"app_id"：“”，“日志”：None}
     :param path:文件路径
     :param device: 设备ID
     :param status: 完成状态
@@ -471,15 +478,19 @@ class InstallApp:
         self.choose_devices_frame = LabelFrame(self.button_frame, text="选中设备上操作：")
         self.choose_devices_frame.grid(row=1, column=0, pady=10, columnspan=2)
 
-        self.debug_button = Button(self.choose_devices_frame, text="开启正式线调试模式", width=22,
+        self.debug_button = Button(self.choose_devices_frame, text="开启正式线调试模式", width=21,
                                    command=lambda: self.thread_it(self.debug_commend))
         self.debug_button.grid(row=0, column=0, pady=5)
-        self.delete_button = Button(self.choose_devices_frame, text="卸载思维", width=22,
+        self.delete_button = Button(self.choose_devices_frame, text="卸载思维", width=15,
                                     command=lambda: self.thread_it(self.delete_commend))
         self.delete_button.grid(row=0, column=1, pady=5)
-        self.delete_button = Button(self.choose_devices_frame, text="清空思维", width=22,
+        self.delete_button = Button(self.choose_devices_frame, text="清空思维", width=15,
                                     command=lambda: self.thread_it(self.clear_commend))
         self.delete_button.grid(row=0, column=2, pady=5)
+
+        self.setting_button = Button(self.choose_devices_frame, text="打开语言设置", width=15,
+                                     command=lambda: self.thread_it(self.setting_commend))
+        self.setting_button.grid(row=0, column=3, pady=5)
         # 下方区域==============================================================
         self.log_frame = LabelFrame(self.init_window_name, text="任务列表：")
         self.log_frame.grid(row=2, column=0, padx=15, columnspan=2)
@@ -489,15 +500,11 @@ class InstallApp:
         self.clear_button = Button(self.log_frame, text="清空", height=1, width=10, command=self.canvas_clear)
         self.clear_button.grid(row=0, column=0, sticky="E", columnspan=2)
 
+        # 任务列表
         self.task_canvas = Canvas(self.log_frame, width=self.width - 80, height=200, bg="white")
         self.task_canvas.grid(row=1, column=0, padx=5, columnspan=2)
         self.task_canvas_header = {"序号": 60, "状态": 120, "设备": 200, "文件": 550, "操作": 900}
-
-        # 绘制标题
-        # self.task_canvas_header = {"序号": 60, "状态": 120, "设备": 200, "文件": 550, "操作": 900}
-        # for key, value in self.task_canvas_header.items():
-        #     self.task_canvas.create_text(value, 20, text=key, anchor="center")
-        self.y = 20
+        self.y = 20  # 标题高度
         self.add_canvas()
         # 设置滚动区域
         self.task_canvas.configure(scrollregion=self.task_canvas.bbox("all"))
@@ -531,6 +538,15 @@ class InstallApp:
         widget.clipboard_clear()
         widget.clipboard_append(selected_text)
         self.massage_label.config(text="已复制文件地址")
+
+    def setting_commend(self):
+        select_devices = self.devices_checkbutton_get()
+        if select_devices:
+            for d in select_devices:
+                self.thread_it(setting_debug, d)
+                task_control("com.sinyee.babybus.mathIII", d, "开启语言设置")
+        else:
+            self.massage_label.config(text="没有选中设备")
 
     def add_canvas(self):
         global task_list
