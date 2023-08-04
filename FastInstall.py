@@ -287,8 +287,10 @@ def uninstall(device, package_name):
     log_info = '包名：' + package_name + '  设备：' + str(device)
     if 'Success' in uninstall_command[-9:]:
         logging.info("【删除成功】：" + log_info)
+        return True
     else:
         logging.error("【删除失败】" + log_info + "\n原因:\n" + uninstall_command)
+        return False
 
 
 def luncher_app(device, package_name):
@@ -338,17 +340,17 @@ def setting_debug(device):
 def run_install(path, devices_list, appkey=None, is_luncher=False):
     # 卸载、安装、启动、点击协议
     for device in devices_list:
-        tast_id = task_control(path, device, "安装进行中")
+        task_id = task_control(path, device, "安装进行中")
         if appkey:
             uninstall(device, appkey)
         appkey_list = adb_install(device, path)  # 安装,获取包名
         if appkey_list:
-            task_control(path, device, "安装成功", appkey_list[0], tast_id, commend=["打开"])
+            task_control(path, device, "安装成功", appkey_list[0], task_id, commend=["打开"])
             if is_luncher:
                 appkey = appkey_list[0][0]
                 luncher_app(device, appkey)
         else:
-            task_control(path, device, "安装失败", tast_id=tast_id, commend=[])
+            task_control(path, device, "安装失败", task_id=task_id, commend=[])
     return appkey
 
 
@@ -380,14 +382,14 @@ def task_clear():
     task_list_observer.notify()  # 通知任务列表已更新
 
 
-def task_control(path="", device="", status="未开始", app_id=None, tast_id=0, commend=None, log=None):
+def task_control(path="", device="", status="未开始", app_id=None, task_id=0, commend=None, log=None):
     """
     用于更新任务列表task_list数据。
     模板{"序号": 0, "状态": status, "设备": device, "设备ID": device, "文件": path, "操作": [],"app_id"：“”，“日志”：None}
     :param path:文件路径
     :param device: 设备ID
     :param status: 完成状态
-    :param tast_id: 任务ID
+    :param task_id: 任务ID
     :param app_id: 应用包名
     :param commend: 操作按钮
     :param log: 日志
@@ -395,18 +397,18 @@ def task_control(path="", device="", status="未开始", app_id=None, tast_id=0,
     """
     global task_list, devices
     device_name = [n[1] for n in devices if device in n]
-    if tast_id == 0:
-        tast_id = len(task_list) + 1
-        task_list.insert(0, {"序号": tast_id, "状态": status, "设备": device_name, "设备ID": device, "文件": path, "操作": commend,
+    if task_id == 0:
+        task_id = len(task_list) + 1
+        task_list.insert(0, {"序号": task_id, "状态": status, "设备": device_name, "设备ID": device, "文件": path, "操作": commend,
                              "app_id": app_id, "日志": log})
     else:
         for i in range(len(task_list)):
-            if task_list[i]["序号"] == tast_id:
-                task_list[i] = {"序号": tast_id, "状态": status, "设备": device_name, "设备ID": device, "文件": path,
+            if task_list[i]["序号"] == task_id:
+                task_list[i] = {"序号": task_id, "状态": status, "设备": device_name, "设备ID": device, "文件": path,
                                 "操作": commend, "app_id": app_id, "日志": log}
 
     task_list_observer.notify()  # 通知任务列表已更新
-    return tast_id
+    return task_id
 
 
 class InstallApp:
@@ -657,8 +659,7 @@ class InstallApp:
         if '安装' in task['状态']:
             self.thread_it(run_install, task['文件'], [task['设备ID']])
         elif '卸载' in task['状态']:
-            self.thread_it(uninstall, task['设备ID'], "com.sinyee.babybus.mathIII")
-            task_control("com.sinyee.babybus.mathIII", task['设备ID'], "卸载思维")
+            self.thread_it(self.delete_commend)
         elif '调试' in task['状态']:
             self.thread_it(release_debug, task['设备ID'])
             task_control("", task['设备ID'], "开启调试")
@@ -666,12 +667,12 @@ class InstallApp:
             self.thread_it(clear_app, task['设备ID'], "com.sinyee.babybus.mathIII")
             task_control("com.sinyee.babybus.mathIII", task['设备ID'], "清空思维")
         elif '核验' in task['状态']:
-            tast_id = task_control(task['文件'], "", "核验包数据")
+            task_id = task_control(task['文件'], "", "核验包数据")
             result = DefaultCheck(task['文件']).main()
             if result["state"] == 0:
-                task_control(tast_id=tast_id, path=task['文件'], device="", status="核验包成功", log=result, commend=["日志"])
+                task_control(task_id=task_id, path=task['文件'], device="", status="核验包成功", log=result, commend=["日志"])
             elif result["state"] == -1:
-                task_control(tast_id=tast_id, path=task['文件'], device="", status="核验包失败", log=result, commend=["日志"])
+                task_control(task_id=task_id, path=task['文件'], device="", status="核验包失败", log=result, commend=["日志"])
 
     def devices_checkbutton(self):
         # 构建复选框
@@ -714,11 +715,25 @@ class InstallApp:
             self.massage_label.config(text="没有选中设备")
 
     def delete_commend(self):
+        # 卸载安装包
+        def delete_task(device, app_id):
+            # 卸载任务管理
+            task_id = task_control(app_id, device, "卸载中")
+            result = uninstall(device, app_id)
+            if result:
+                task_control(task_id=task_id, path=app_id, device=device, status="卸载成功")
+            else:
+                task_control(task_id=task_id, path=app_id, device=device, status="卸载失败")
+
         select_devices = self.devices_checkbutton_get()
         if select_devices:
             for d in select_devices:
-                self.thread_it(uninstall, d, "com.sinyee.babybus.mathIII")
-                task_control("com.sinyee.babybus.mathIII", d, "卸载思维")
+                app_key = "com.sinyee.babybus.mathIII"
+                packages = get_packages_list(d)
+                if app_key in packages:
+                    self.thread_it(delete_task, d, app_key)
+                else:
+                    task_control(app_key, d, "设备上无包")
         else:
             self.massage_label.config(text="没有选中设备")
 
@@ -737,13 +752,13 @@ class InstallApp:
         file_list = get_adress(file_path_data)
 
         for index, f in enumerate(file_list):
-            tast_id = task_control(f, "", "核验包数据")
+            task_id = task_control(f, "", "核验包数据")
             self.massage_label.config(text="检测默认数据，第" + str(index + 1) + "个安装包")
             result = DefaultCheck(f).main()
             if result["state"] == 0:
-                task_control(tast_id=tast_id, path=f, device="", status="核验包成功", log=result, commend=["日志"])
+                task_control(task_id=task_id, path=f, device="", status="核验包成功", log=result, commend=["日志"])
             elif result["state"] == -1:
-                task_control(tast_id=tast_id, path=f, device="", status="核验包失败", log=result, commend=["日志"])
+                task_control(task_id=task_id, path=f, device="", status="核验包失败", log=result, commend=["日志"])
         self.massage_label.config(text="检测默认数据完成")
 
     def run(self):
