@@ -29,6 +29,12 @@ class DefaultCheck:
     lang_path = ['math_config_ar.json', 'math_config_en.json', 'math_config_es.json', 'math_config_fr.json',
                  'math_config_id.json', 'math_config_ja.json', 'math_config_ko.json', 'math_config_pt.json',
                  'math_config_ru.json', 'math_config_th.json', 'math_config_vi.json', 'math_config_zht.json']
+
+    expand_lang_path = ['math_config_expand_ar.json', 'math_config_expand_en.json', 'math_config_expand_es.json',
+                        'math_config_expand_fr.json', 'math_config_expand_id.json', 'math_config_expand_ja.json',
+                        'math_config_expand_ko.json', 'math_config_expand_pt.json', 'math_config_expand_ru.json',
+                        'math_config_expand_th.json', 'math_config_expand_vi.json', 'math_config_expand_zht.json']
+
     path_config = {
         "apk": {"image_path": "/assets/package_config/images/", "package_config_path": "/assets/package_config/",
                 "default_game_path": "/assets/res/subModules/default_game.json"},
@@ -232,14 +238,12 @@ class DefaultCheck:
 # 获取devices数量和名称
 def get_devices_all():
     global devices
-    devices = []
-    try:
-        for dName_ in os.popen('adb devices -l'):
-            if "List of devices attached" not in dName_:
-                name_list = dName_.split()
+    devices = []  # 每次都重置设备列表
+    for dName_ in os.popen('adb devices -l'):
+        if "List of devices attached" not in dName_:
+            name_list = dName_.split()
+            if "device" in name_list:  # 只加入成功连接的设备
                 devices.append([name_list[0], name_list[3].strip("model:")])
-    except:
-        pass
     return devices
 
 
