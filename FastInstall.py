@@ -679,8 +679,13 @@ class InstallApp:
                     log_text.insert("end", "体验岛阶段课程数量：" + "\n", "标题")
                     for key, value in i["count"].items():
                         log_text.insert("end", level_o_str[key] + ":" + str(value) + "\n")
+                elif i["level"] == "趣味拓展-0":
+                    level_o_str = {"0": "未选阶段课程", "1": "未入园", "2": "小班", "3": "中班", "4": "大班"}
+                    log_text.insert("end", "趣味拓展各阶段免费课程数量：" + "\n", "标题")
+                    for key, value in i["count"].items():
+                        log_text.insert("end", level_o_str[key] + ":" + str(value) + "\n")
                 else:
-                    log_text.insert("end", "阶段" + i["level"] + "：课程数量 " + str(i["count"]) + "\n")
+                    log_text.insert("end", "阶段-" + i["level"] + "：课程数量 " + str(i["count"]) + "\n")
 
                 if i["error"]:
                     log_text.insert("end", "海外存在MV环节的课程：" + str(i["error"]) + "\n")
