@@ -21,6 +21,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s-%(levelname)s: [%(f
 
 devices = []  # 当前连接设备
 task_list = []
+app_key = "com.sinyee.babybus.mathIII"
 
 
 class TaskListObserver:
@@ -517,11 +518,19 @@ class InstallApp:
         radiobutton_w = int(60 / len(mode_list))
         for m in range(len(mode_list)):
             Radiobutton(self.mode_frame, text=mode_list[m], variable=self.mode_data, value=mode_list[m], indicatoron=0,
-                        width=radiobutton_w).grid(row=0, column=m, padx=1, sticky="E")
-
+                        width=radiobutton_w).grid(row=0, column=m, sticky="E")
+        # 包名区域----------------------
+        self.app_key_frame = LabelFrame(self.install_frame, text="包名：", width=self.width / 2)
+        self.app_key_frame.grid(row=1, column=0)
+        self.app_key_var = StringVar()
+        self.app_key_var.set(app_key)
+        self.app_key_entry = Entry(self.app_key_frame, textvariable=self.app_key_var, width=51)
+        self.app_key_entry.grid(row=0, column=0, padx=3, ipady=3)
+        self.app_key_button = Button(self.app_key_frame, text="设置", width=10, command=self.app_key_setting)
+        self.app_key_button.grid(row=0, column=1)
         # 文件地址区域-------------------------------------------------------------
         self.file_path_frame = LabelFrame(self.install_frame, text="文件地址：")
-        self.file_path_frame.grid(row=1, column=0)
+        self.file_path_frame.grid(row=2, column=0)
         self.file_label = Label(self.file_path_frame, text="（将文件拖入窗口任意位置即可获取文件地址）")
         self.file_label.grid(row=0, column=0, sticky="W")
         # 文本框清空按钮
@@ -534,7 +543,7 @@ class InstallApp:
         # 右边-上边区域==============================================================
         # 设备选择区域-------------------------------------------------------------
         self.devices_frame = LabelFrame(self.install_frame, text="设备选择：（不选默认所有）", width=66)
-        self.devices_frame.grid(row=0, column=1, sticky="E", padx=10)
+        self.devices_frame.grid(row=0, column=1, sticky="E", padx=10, rowspan=2)
         # 设备复选框
         self.checkboxes = {}
         self.devices_button = []
@@ -546,7 +555,7 @@ class InstallApp:
 
         # 按钮区域-------------------------------------------------------------
         self.button_frame = Frame(self.install_frame)
-        self.button_frame.grid(row=1, column=1, padx=10, pady=10)
+        self.button_frame.grid(row=2, column=1, padx=10, pady=10)
         # 开始按钮
         self.install_button = Button(self.button_frame, text="核验思维默认数据", width=22,
                                      command=lambda: self.thread_it(self.default_check))
@@ -561,10 +570,10 @@ class InstallApp:
         self.debug_button = Button(self.choose_devices_frame, text="开启正式线调试模式", width=21,
                                    command=lambda: self.thread_it(self.debug_commend))
         self.debug_button.grid(row=0, column=0, pady=5)
-        self.delete_button = Button(self.choose_devices_frame, text="卸载思维", width=15,
+        self.delete_button = Button(self.choose_devices_frame, text="卸载", width=15,
                                     command=lambda: self.thread_it(self.delete_commend))
         self.delete_button.grid(row=0, column=1, pady=5)
-        self.delete_button = Button(self.choose_devices_frame, text="清空思维", width=15,
+        self.delete_button = Button(self.choose_devices_frame, text="清空", width=15,
                                     command=lambda: self.thread_it(self.clear_commend))
         self.delete_button.grid(row=0, column=2, pady=5)
 
@@ -605,6 +614,10 @@ class InstallApp:
         # self.continue_button.grid(row=0, column=0, sticky="E", ipadx=3)
         # self.cancel_button.grid(row=0, column=1, sticky="W", padx=3)
 
+    def app_key_setting(self):
+        global app_key
+        app_key = self.app_key_entry.get()
+
     @staticmethod
     def open_commend(task):
         open_app(task['设备ID'], task['app_id'][0])
@@ -624,7 +637,7 @@ class InstallApp:
         if select_devices:
             for d in select_devices:
                 self.thread_it(setting_debug, d)
-                task_control("com.sinyee.babybus.mathIII", d, "开启语言设置")
+                task_control(app_key, d, "开启语言设置")
         else:
             self.massage_label.config(text="没有选中设备")
 
@@ -763,8 +776,8 @@ class InstallApp:
             self.thread_it(release_debug, task['设备ID'])
             task_control("", task['设备ID'], "开启调试")
         elif '清空' in task['状态']:
-            self.thread_it(clear_app, task['设备ID'], "com.sinyee.babybus.mathIII")
-            task_control("com.sinyee.babybus.mathIII", task['设备ID'], "清空思维")
+            self.thread_it(clear_app, task['设备ID'], task['app_id'])
+            task_control(app_id=task['app_id'], path=task['app_id'], device=task['设备ID'], status="清空")
         elif '核验' in task['状态']:
             task_id = task_control(task['文件'], "", "核验包数据")
             result = DefaultCheck(task['文件']).main()
@@ -827,7 +840,7 @@ class InstallApp:
         select_devices = self.devices_checkbutton_get()
         if select_devices:
             for d in select_devices:
-                app_key = "com.sinyee.babybus.mathIII"
+                global app_key
                 packages = get_packages_list(d)
                 if app_key in packages:
                     self.thread_it(delete_task, d, app_key)
@@ -840,8 +853,8 @@ class InstallApp:
         select_devices = self.devices_checkbutton_get()
         if select_devices:
             for d in select_devices:
-                self.thread_it(clear_app, d, "com.sinyee.babybus.mathIII")
-                task_control("com.sinyee.babybus.mathIII", d, "清空思维")
+                self.thread_it(clear_app, d, app_key)
+                task_control(app_key, d, "清空")
         else:
             self.massage_label.config(text="没有选中设备")
 
