@@ -156,7 +156,7 @@ class DefaultCheck:
                 level_result_copy["level"] = level["style"]["fieldData"]["level"]
                 for lesson in level["data"]:
                     level_result_copy["count"] += 1
-                    if is_lang:
+                    if is_lang and lesson["dataCode"] != "ConfigData":
                         if any(t["type"] == "mv" for t in lesson["fieldData"]["stepConfig"]):
                             level_result_copy["error"].append(
                                 {"areaDataID": lesson["areaDataID"], "id": lesson["id"], "title": lesson["title"],
