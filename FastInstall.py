@@ -17,7 +17,9 @@ from copy import deepcopy
 快速安卓启动卸载
 '''
 # 日志设置
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
+# logging.basicConfig(filename='test.log', level=logging.DEBUG,
+#                     format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
+logging.basicConfig(level=logging.DEBUG,format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
 
 devices = []  # 当前连接设备
 task_list = []
@@ -98,7 +100,11 @@ class DefaultCheck:
         # 创建目录
         os.mkdir(self.path_cache)
         # 提取 zip 文件
-        zip_file.extractall(self.path_cache)
+        try:
+            zip_file.extractall(self.path_cache)
+            # 解压resources.arsc文件时会出错，只有打包出来的文件有问题，暂时没有解决办法
+        except:
+            pass
         # 关闭 zip 文件
         zip_file.close()
 
