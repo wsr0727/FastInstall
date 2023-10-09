@@ -149,13 +149,14 @@ class DefaultCheck:
             if level["style"]["fieldData"]["level"] == "0":
                 level_0_result_copy = deepcopy(level_0_result)
                 for grade in level["data"]:
-                    level_0_result_copy["count"][grade['fieldData']["grade"]] += 1
-                    if is_lang:
-                        if any(t["type"] == "mv" for t in grade["fieldData"]["stepConfig"]):
-                            level_0_result_copy["error"].append(
-                                {"areaDataID": grade["areaDataID"], "id": grade["id"], "title": grade["title"],
-                                 "packageIdent": grade["fieldData"]["packageIdent"],
-                                 "lang": grade["fieldData"]["lang"], "grade": grade["fieldData"]["grade"]})
+                    if grade["dataCode"] != "ConfigData":
+                        level_0_result_copy["count"][grade['fieldData']["grade"]] += 1
+                        if is_lang:
+                            if any(t["type"] == "mv" for t in grade["fieldData"]["stepConfig"]):
+                                level_0_result_copy["error"].append(
+                                    {"areaDataID": grade["areaDataID"], "id": grade["id"], "title": grade["title"],
+                                     "packageIdent": grade["fieldData"]["packageIdent"],
+                                     "lang": grade["fieldData"]["lang"], "grade": grade["fieldData"]["grade"]})
                 package_config_check_result.append(level_0_result_copy)
             else:
                 level_result_copy = deepcopy(level_result)
