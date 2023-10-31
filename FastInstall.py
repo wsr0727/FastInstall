@@ -10,20 +10,59 @@ import threading
 import random
 import json
 from copy import deepcopy
+import configparser
 
-# 打包指令 pyinstaller -F -w FastInstall.py
-
-'''
-快速安卓启动卸载
-'''
 # 日志设置
 # logging.basicConfig(filename='test.log', level=logging.DEBUG,
 #                     format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
-logging.basicConfig(level=logging.DEBUG,format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
-
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
+# 打包指令 pyinstaller -F -w FastInstall.py
+'''
+快速安卓启动卸载
+'''
 devices = []  # 当前连接设备
-task_list = []
-app_key = "com.sinyee.babybus.mathIII"
+task_list = []  # 任务列表
+
+
+def config_set(key_value):
+    # key_value = {"key": {"app": "balue"}} 参数格式
+    # 初始化设置文件
+
+    # 创建一个解析器对象
+    cfg = configparser.ConfigParser()
+    if not os.path.exists("FastInstall.config"):
+        # 如果没有，创建一个新文件
+        with open("FastInstall.config", "w") as f:
+            # 向设置文件写入默认内容
+            f.write("[app]" + "\n")
+            f.write("app_key = com.sinyee.babybus.mathIII" + "\n")
+
+    # 读取config文件的内容
+    cfg.read("FastInstall.config")
+
+    logging.debug("设置默认值：" + str(key_value))
+    for i in key_value.keys():
+        for j in key_value[i]:
+            cfg.set(i, j, key_value[i][j])
+
+    # 保存修改
+    with open("FastInstall.config", "w") as f:
+        cfg.write(f)
+        logging.debug("保存默认文件的修改")
+
+
+def app_key_set():
+    # 初始化app_key
+    if os.path.exists("FastInstall.config"):
+        cfg = configparser.ConfigParser()
+        cfg.read("FastInstall.config")
+        app_key_get = cfg.get("app", "app_key")
+        return app_key_get
+    else:
+        return "com.sinyee.babybus.mathIII"
+
+
+app_key = app_key_set()
 
 
 class TaskListObserver:
@@ -624,6 +663,7 @@ class InstallApp:
     def app_key_setting(self):
         global app_key
         app_key = self.app_key_entry.get()
+        config_set({"app": {"app_key": app_key}})
 
     @staticmethod
     def open_commend(task):
