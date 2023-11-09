@@ -11,6 +11,7 @@ import random
 import json
 from copy import deepcopy
 import configparser
+from tkinter import ttk
 
 # 日志设置
 # logging.basicConfig(filename='test.log', level=logging.DEBUG,
@@ -166,7 +167,7 @@ class DefaultCheck:
         if os.path.isdir(dir_path):
             files = os.listdir(dir_path)
             count_files = [file for file in files if file.endswith('.' + extension)]
-            logging.debug("文件内文件数量：" + extension + "：" + str(len(count_files)))
+            logging.debug(str(files) + "文件内文件数量：" + extension + "：" + str(len(count_files)))
             return len(count_files)
         else:
             logging.debug("文件目录不存在")
@@ -316,7 +317,8 @@ class DefaultCheck:
         image_png = self.count_files(self.path_cache + image_path_path, "png")  # 判断默认图片是否存在
         if image_png >= 0:
             self.result["data"]["image"].update({"data": image_png, "state": 0, "message": ""})
-
+        elif image_png == -1:
+            self.result["data"]["image"].update({"state": -1, "data": image_png, "message": "【默认图片文件不存在】"})
         logging.debug("提取文件数据")
         package_config_zh_data = self.extract_json_data(package_config_zh_path)
         package_config_lang_data = self.extract_json_data(package_config_lang_path)
@@ -481,21 +483,7 @@ def setting_debug(device):
     os.popen("adb -s " + device + " shell am start -a android.settings.LOCALE_SETTINGS").read()
 
 
-def run_install(path, devices_list, appkey=None, is_luncher=False):
-    # 卸载、安装、启动、点击协议
-    for device in devices_list:
-        task_id = task_control(path, device, "安装进行中")
-        if appkey:
-            uninstall(device, appkey)
-        appkey_list = adb_install(device, path)  # 安装,获取包名
-        if appkey_list:
-            task_control(path, device, "安装成功", appkey_list[0], task_id, commend=["打开"])
-            if is_luncher:
-                appkey = appkey_list[0][0]
-                luncher_app(device, appkey)
-        else:
-            task_control(path, device, "安装失败", task_id=task_id, commend=[])
-    return appkey
+
 
 
 def task_clear():
@@ -631,25 +619,51 @@ class InstallApp:
         self.log_frame.grid(row=2, column=0, padx=15, columnspan=2)
         self.task_label = Label(self.log_frame, text="（单击文件地址可复制）")
         self.task_label.grid(row=0, column=0, sticky="W")
+        # # 清空按钮
+        # self.clear_button = Button(self.log_frame, text="清空", height=1, width=10, command=self.canvas_clear)
+        # self.clear_button.grid(row=0, column=0, sticky="E", columnspan=2)
+
         # 清空按钮
-        self.clear_button = Button(self.log_frame, text="清空", height=1, width=10, command=self.canvas_clear)
+        self.clear_button = Button(self.log_frame, text="清空", height=1, width=10, command=self.clear_tree)
         self.clear_button.grid(row=0, column=0, sticky="E", columnspan=2)
 
+        # 创建一个Treeview控件
+        self.tree = ttk.Treeview(self.log_frame)
+
+        # 定义列
+        self.tree["columns"] = ("状态", "设备", "文件", "操作")
+        self.task_tree_header = {"状态": 120, "设备": 120, "文件": 350, "操作": 200}
+        self.tree.column("#0", width=60, minwidth=30)
+        self.tree.heading("#0", text="序号")
+        self.tree.tag_configure("center", anchor="center")
+
+        # 设置列，我们还可以指定列，#0是特殊的列，它指的是列表的第一列，设置显示的表头名
+        for key, value in self.task_tree_header.items():
+            self.tree.column(key, width=value, minwidth=value)
+            self.tree.heading(key, text=key)
+
+        # # 插入数据
+        # tree.insert("", 0, text="Line 1", values=("1A", "1b"))
+        # tree.insert("", 1, text="Line 2", values=("2A", "2b"))
+
+        # 将Treeview控件添加到窗口中
+        self.tree.grid(row=1, column=0, padx=5, columnspan=2)
+        task_list_observer.register(self.add_tree)
         # 任务列表
-        self.task_canvas = Canvas(self.log_frame, width=self.width - 80, height=200, bg="white")
-        self.task_canvas.grid(row=1, column=0, padx=5, columnspan=2)
-        self.task_canvas_header = {"序号": 60, "状态": 120, "设备": 200, "文件": 550, "操作": 900}
-        self.y = 20  # 标题高度
-        self.add_canvas()
-        # 设置滚动区域
-        self.task_canvas.configure(scrollregion=self.task_canvas.bbox("all"))
-        # 添加滚动条
-        scrollbar = Scrollbar(self.log_frame)
-        scrollbar.grid(row=1, column=2, sticky="ns")
-        scrollbar.configure(command=self.task_canvas.yview)
-        self.task_canvas.configure(yscrollcommand=scrollbar.set)
-        # 任务列表有变化时，刷新列表
-        task_list_observer.register(self.add_canvas)
+        # self.task_canvas = Canvas(self.log_frame, width=self.width - 80, height=200, bg="white")
+        # self.task_canvas.grid(row=1, column=0, padx=5, columnspan=2)
+        # self.task_canvas_header = {"序号": 60, "状态": 120, "设备": 200, "文件": 550, "操作": 900}
+        # self.y = 20  # 标题高度
+        # self.add_canvas()
+        # # 设置滚动区域
+        # self.task_canvas.configure(scrollregion=self.task_canvas.bbox("all"))
+        # # 添加滚动条
+        # scrollbar = Scrollbar(self.log_frame)
+        # scrollbar.grid(row=1, column=2, sticky="ns")
+        # scrollbar.configure(command=self.task_canvas.yview)
+        # self.task_canvas.configure(yscrollcommand=scrollbar.set)
+        # # 任务列表有变化时，刷新列表
+        # task_list_observer.register(self.add_canvas)
 
         # 继续按钮
         self.continue_button = Button(self.log_frame, text="批量任务继续进行", height=1, width=20, command=self.is_continue)
@@ -659,6 +673,38 @@ class InstallApp:
         self.isCancel = False
         # self.continue_button.grid(row=0, column=0, sticky="E", ipadx=3)
         # self.cancel_button.grid(row=0, column=1, sticky="W", padx=3)
+
+    def add_tree(self):
+
+        row_data = self.tree.get_children()
+        # 取第一行的序号，没有的话就是0
+        first_id = self.tree.item(row_data[0])["text"] if row_data else 0
+        print(first_id)
+        # if row_data:
+        #     first_id = self.tree.item(row_data[0])["text"]
+
+        for i in task_list:
+            if i["序号"] > int(first_id):
+                item_id = self.tree.insert("", 0, text=i["序号"], values=(i['状态'], i['设备'], i['文件'], i['操作']),
+                                           tags=("center",))
+                i["item_id"] = item_id
+
+    def set_tree(self, item_id,column_name, new_value):
+        # # 然后在需要的时候修改这个项目
+        # self.tree.item(item_id, text='新的项目名', values=values)
+        self.tree.set(item_id, column_name, new_value)
+
+    def clear_tree(self):
+        row_data = self.tree.get_children()
+        if row_data:
+            task_clear()
+            for i in row_data:
+                self.tree.delete(i)
+
+    # def selectItem(a):
+    #     # 获取当前列表的选中项
+    #     curItem = tree.focus()
+    #     print(tree.item(curItem))
 
     def app_key_setting(self):
         global app_key
@@ -721,6 +767,7 @@ class InstallApp:
                     elif b == "日志":
                         if i['日志']:
                             button = Button(self.task_canvas, text=b, command=lambda i2=i: self.show_log(i2))
+                            print(i)
                             self.task_canvas.create_window(self.task_canvas_header['操作'] + 20, self.y, window=button)
             self.task_canvas.configure(scrollregion=self.task_canvas.bbox("all"))
 
@@ -816,7 +863,7 @@ class InstallApp:
 
     def clone_task(self, task):
         if '安装' in task['状态']:
-            self.thread_it(run_install, task['文件'], [task['设备ID']])
+            self.thread_it(self.run_install, task['文件'], [task['设备ID']])
         elif '卸载' in task['状态']:
             self.thread_it(self.delete_commend)
         elif '调试' in task['状态']:
@@ -916,9 +963,27 @@ class InstallApp:
             result = DefaultCheck(f).main()
             if result["state"] == 0:
                 task_control(task_id=task_id, path=f, device="", status="核验包成功", log=result, commend=["日志"])
+                self.set_tree()
             elif result["state"] == -1:
                 task_control(task_id=task_id, path=f, device="", status="核验包失败", log=result, commend=["日志"])
         self.massage_label.config(text="检测默认数据完成")
+
+    @staticmethod
+    def run_install(path, devices_list, appkey=None, is_luncher=False):
+        # 卸载、安装、启动、点击协议
+        for device in devices_list:
+            task_id = task_control(path, device, "安装进行中")
+            if appkey:
+                uninstall(device, appkey)
+            appkey_list = adb_install(device, path)  # 安装,获取包名
+            if appkey_list:
+                task_control(path, device, "安装成功", appkey_list[0], task_id, commend=["打开"])
+                if is_luncher:
+                    appkey = appkey_list[0][0]
+                    luncher_app(device, appkey)
+            else:
+                task_control(path, device, "安装失败", task_id=task_id, commend=[])
+        return appkey
 
     def run(self):
         file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
@@ -935,10 +1000,10 @@ class InstallApp:
                     self.isCancel = False
                     break
                 if self.mode_data.get() == "仅安装":
-                    self.thread_it(run_install, f, select_devices)
+                    self.thread_it(self.run_install, f, select_devices)
                 else:
                     self.massage_label.config(text="批量任务进行中：第" + str(index + 1) + "个安装包开始")
-                    app_key = run_install(f, select_devices, app_key, True)
+                    app_key = self.run_install(f, select_devices, app_key, True)
                     self.massage_label.config(text="批量任务进行中：第" + str(index + 1) + "个安装包结束")
                     if index != len(file_list) - 1 and self.mode_data.get() == "批量出包安装(手动)":
                         self.continue_button.grid(row=0, column=0, sticky="E", ipadx=3)
