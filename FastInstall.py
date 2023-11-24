@@ -483,9 +483,6 @@ def setting_debug(device):
     os.popen("adb -s " + device + " shell am start -a android.settings.LOCALE_SETTINGS").read()
 
 
-
-
-
 def task_clear():
     """
     # 清空任务列表
@@ -495,7 +492,16 @@ def task_clear():
     task_list_observer.notify()  # 通知任务列表已更新
 
 
-def task_control(path="", device="", status="未开始", app_id=None, task_id=0, commend=None, log=None):
+def get_app_key(path):
+    # 根据文件获取包名
+    file_name = path.split('\\')[-1]
+    file_name_str = file_name.split('-')
+    for i in file_name_str:
+        if "com." in i:
+            return file_name,app_key
+
+
+def task_control(path=None, device="", status="未开始", app_id=None, task_id=0, commend=None, log=None):
     """
     用于更新任务列表task_list数据。
     模板{"序号": 0, "状态": status, "设备": device, "设备ID": device, "文件": path, "操作": [],"app_id"：“”，“日志”：None}
@@ -510,6 +516,11 @@ def task_control(path="", device="", status="未开始", app_id=None, task_id=0,
     """
     global task_list, devices
     device_name = [n[1] for n in devices if device in n]
+    if path:  # 地址不为空才判断
+        result = get_app_key(path)
+        if result:
+            path = result[0]
+            app_id = result[1]
     if task_id == 0:
         task_id = len(task_list) + 1
         task_list.insert(0, {"序号": task_id, "状态": status, "设备": device_name, "设备ID": device, "文件": path, "操作": commend,
@@ -617,39 +628,62 @@ class InstallApp:
         # 下方区域==============================================================
         self.log_frame = LabelFrame(self.init_window_name, text="任务列表：")
         self.log_frame.grid(row=2, column=0, padx=15, columnspan=2)
-        self.task_label = Label(self.log_frame, text="（单击文件地址可复制）")
-        self.task_label.grid(row=0, column=0, sticky="W")
+        # self.task_label = Label(self.log_frame, text="（单击文件地址可复制）")
+        # self.task_label.grid(row=0, column=0, sticky="W")
         # # 清空按钮
         # self.clear_button = Button(self.log_frame, text="清空", height=1, width=10, command=self.canvas_clear)
         # self.clear_button.grid(row=0, column=0, sticky="E", columnspan=2)
 
+        self.log_button_frame = LabelFrame(self.log_frame, text="操作：")
+        self.log_button_frame.grid(row=0, column=1)
+        btn_w = 15  # 操作按钮区域宽度
         # 清空按钮
-        self.clear_button = Button(self.log_frame, text="清空", height=1, width=10, command=self.clear_tree)
-        self.clear_button.grid(row=0, column=0, sticky="E", columnspan=2)
+        self.clear_button = Button(self.log_button_frame, text="清空", height=1, width=btn_w, command=self.clear_tree)
+        self.clear_button.grid(row=0, column=0)
+
+        # 打开按钮
+        self.open_button = Button(self.log_button_frame, text="打开", height=1, width=btn_w, command=self.clear_tree)
+        self.open_button.grid(row=1, column=0)
+
+        # 克隆按钮
+        self.open_button = Button(self.log_button_frame, text="克隆", height=1, width=btn_w, command=self.clear_tree)
+        self.open_button.grid(row=2, column=0)
+
+        # 日志按钮
+        self.open_button = Button(self.log_button_frame, text="日志", height=1, width=btn_w, command=self.clear_tree)
+        self.open_button.grid(row=3, column=0)
+
+        # 继续按钮
+        self.continue_button = Button(self.log_button_frame, text="批量任务继续进行", height=1, width=btn_w,
+                                      command=self.is_continue)
+        self.isContinue = False
+        # 取消按钮
+        self.cancel_button = Button(self.log_button_frame, text="取消后续任务", height=1, width=btn_w, command=self.is_cancel)
+        self.isCancel = False
+        # self.continue_button.grid(row=4, column=0)
+        # self.cancel_button.grid(row=5, column=0)
 
         # 创建一个Treeview控件
         self.tree = ttk.Treeview(self.log_frame)
 
         # 定义列
-        self.tree["columns"] = ("状态", "设备", "文件", "操作")
-        self.task_tree_header = {"状态": 120, "设备": 120, "文件": 350, "操作": 200}
+        self.tree["columns"] = ("状态", "设备", "文件", "包名")
+        self.task_tree_header = {"状态": 120, "设备": 120, "文件": 350, "包名": 200}
         self.tree.column("#0", width=60, minwidth=30)
         self.tree.heading("#0", text="序号")
-        self.tree.tag_configure("center", anchor="center")
+        self.tree.tag_configure('成功', foreground='green')
+        self.tree.tag_configure('失败', foreground='red')
 
-        # 设置列，我们还可以指定列，#0是特殊的列，它指的是列表的第一列，设置显示的表头名
+        # 设置列，#0是特殊的列，它指的是列表的第一列，设置显示的表头名
         for key, value in self.task_tree_header.items():
-            self.tree.column(key, width=value, minwidth=value)
+            self.tree.column(key, width=value, minwidth=value, anchor="center")
             self.tree.heading(key, text=key)
 
-        # # 插入数据
-        # tree.insert("", 0, text="Line 1", values=("1A", "1b"))
-        # tree.insert("", 1, text="Line 2", values=("2A", "2b"))
-
         # 将Treeview控件添加到窗口中
-        self.tree.grid(row=1, column=0, padx=5, columnspan=2)
+        self.tree.grid(row=0, column=0, padx=5)
         task_list_observer.register(self.add_tree)
-        # 任务列表
+
+        # 旧版 任务列表
         # self.task_canvas = Canvas(self.log_frame, width=self.width - 80, height=200, bg="white")
         # self.task_canvas.grid(row=1, column=0, padx=5, columnspan=2)
         # self.task_canvas_header = {"序号": 60, "状态": 120, "设备": 200, "文件": 550, "操作": 900}
@@ -665,34 +699,26 @@ class InstallApp:
         # # 任务列表有变化时，刷新列表
         # task_list_observer.register(self.add_canvas)
 
-        # 继续按钮
-        self.continue_button = Button(self.log_frame, text="批量任务继续进行", height=1, width=20, command=self.is_continue)
-        self.isContinue = False
-        # 取消按钮
-        self.cancel_button = Button(self.log_frame, text="取消后续任务", height=1, width=20, command=self.is_cancel)
-        self.isCancel = False
-        # self.continue_button.grid(row=0, column=0, sticky="E", ipadx=3)
-        # self.cancel_button.grid(row=0, column=1, sticky="W", padx=3)
-
     def add_tree(self):
-
         row_data = self.tree.get_children()
         # 取第一行的序号，没有的话就是0
         first_id = self.tree.item(row_data[0])["text"] if row_data else 0
-        print(first_id)
-        # if row_data:
-        #     first_id = self.tree.item(row_data[0])["text"]
-
         for i in task_list:
+            # 只更新没有更新过的数据
             if i["序号"] > int(first_id):
-                item_id = self.tree.insert("", 0, text=i["序号"], values=(i['状态'], i['设备'], i['文件'], i['操作']),
-                                           tags=("center",))
+                item_id = self.tree.insert("", 0, text=i["序号"], values=(i['状态'], i['设备'], i['文件'], i['app_id']))
                 i["item_id"] = item_id
+            elif i["序号"] == int(first_id):
+                # 如果当前需要已经写入过了，就跳出循环
+                break
 
-    def set_tree(self, item_id,column_name, new_value):
-        # # 然后在需要的时候修改这个项目
-        # self.tree.item(item_id, text='新的项目名', values=values)
-        self.tree.set(item_id, column_name, new_value)
+    def set_state_tree(self, item_id, new_value):
+        # 更新状态，设置颜色
+        self.tree.set(item_id, "状态", new_value)
+        if "成功" in new_value:
+            self.tree.item(item_id, tags=('成功',))
+        elif "失败" in new_value:
+            self.tree.item(item_id, tags=('失败',))
 
     def clear_tree(self):
         row_data = self.tree.get_children()
@@ -875,10 +901,13 @@ class InstallApp:
         elif '核验' in task['状态']:
             task_id = task_control(task['文件'], "", "核验包数据")
             result = DefaultCheck(task['文件']).main()
+            item_id = self.get_item_id(task_id)
             if result["state"] == 0:
                 task_control(task_id=task_id, path=task['文件'], device="", status="核验包成功", log=result, commend=["日志"])
+                self.set_state_tree(item_id, "核验包成功")
             elif result["state"] == -1:
                 task_control(task_id=task_id, path=task['文件'], device="", status="核验包失败", log=result, commend=["日志"])
+                self.set_state_tree(item_id, "核验包失败")
 
     def devices_checkbutton(self):
         # 构建复选框
@@ -924,12 +953,15 @@ class InstallApp:
         # 卸载安装包
         def delete_task(device, app_id):
             # 卸载任务管理
-            task_id = task_control(app_id, device, "卸载中")
+            task_id = task_control(app_id=app_id, device=device, status="卸载中")
             result = uninstall(device, app_id)
+            item_id = self.get_item_id(task_id)
             if result:
-                task_control(task_id=task_id, path=app_id, device=device, status="卸载成功")
+                task_control(task_id=task_id, app_id=app_id, device=device, status="卸载成功")
+                self.set_state_tree(item_id, "卸载成功")
             else:
-                task_control(task_id=task_id, path=app_id, device=device, status="卸载失败")
+                task_control(task_id=task_id, app_id=app_id, device=device, status="卸载失败")
+                self.set_state_tree(item_id, "卸载失败")
 
         select_devices = self.devices_checkbutton_get()
         if select_devices:
@@ -939,7 +971,7 @@ class InstallApp:
                 if app_key in packages:
                     self.thread_it(delete_task, d, app_key)
                 else:
-                    task_control(app_key, d, "设备上无包")
+                    task_control(app_id=app_key, device=d, status="设备上无包")
         else:
             self.massage_label.config(text="没有选中设备")
 
@@ -952,8 +984,13 @@ class InstallApp:
         else:
             self.massage_label.config(text="没有选中设备")
 
-    def default_check(self):
+    @staticmethod
+    def get_item_id(task_id):
+        for i in task_list:
+            if i["序号"] == task_id:
+                return i["item_id"]
 
+    def default_check(self):
         file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
         file_list = get_adress(file_path_data)
 
@@ -961,28 +998,32 @@ class InstallApp:
             task_id = task_control(f, "", "核验包数据")
             self.massage_label.config(text="检测默认数据，第" + str(index + 1) + "个安装包")
             result = DefaultCheck(f).main()
+            item_id = self.get_item_id(task_id)
             if result["state"] == 0:
                 task_control(task_id=task_id, path=f, device="", status="核验包成功", log=result, commend=["日志"])
-                self.set_tree()
+                self.set_state_tree(item_id, "核验包成功")
             elif result["state"] == -1:
                 task_control(task_id=task_id, path=f, device="", status="核验包失败", log=result, commend=["日志"])
+                self.set_state_tree(item_id, "核验包失败")
         self.massage_label.config(text="检测默认数据完成")
 
-    @staticmethod
-    def run_install(path, devices_list, appkey=None, is_luncher=False):
+    def run_install(self, path, devices_list, appkey=None, is_luncher=False):
         # 卸载、安装、启动、点击协议
         for device in devices_list:
             task_id = task_control(path, device, "安装进行中")
             if appkey:
                 uninstall(device, appkey)
             appkey_list = adb_install(device, path)  # 安装,获取包名
+            item_id = self.get_item_id(task_id)
             if appkey_list:
                 task_control(path, device, "安装成功", appkey_list[0], task_id, commend=["打开"])
+                self.set_state_tree(item_id, "安装成功")
                 if is_luncher:
                     appkey = appkey_list[0][0]
                     luncher_app(device, appkey)
             else:
                 task_control(path, device, "安装失败", task_id=task_id, commend=[])
+                self.set_state_tree(item_id, "安装失败")
         return appkey
 
     def run(self):
@@ -1006,8 +1047,8 @@ class InstallApp:
                     app_key = self.run_install(f, select_devices, app_key, True)
                     self.massage_label.config(text="批量任务进行中：第" + str(index + 1) + "个安装包结束")
                     if index != len(file_list) - 1 and self.mode_data.get() == "批量出包安装(手动)":
-                        self.continue_button.grid(row=0, column=0, sticky="E", ipadx=3)
-                        self.cancel_button.grid(row=0, column=1, sticky="W", padx=3)
+                        self.continue_button.grid(row=4, column=0)
+                        self.cancel_button.grid(row=5, column=0)
                         while not self.isContinue:
                             if self.isCancel:
                                 self.massage_label.config(text="批量任务取消")
