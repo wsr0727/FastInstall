@@ -261,19 +261,21 @@ class DefaultCheck:
 
     @staticmethod
     def expand_result_state(result):
+        # 趣味拓展不再判断是否有免费课程,只判断课程总数是否大于0
         message = ""
-        check = 0
+        count = 0
         for level in result:
             if level["level"] == "趣味拓展-0":
                 for key, value in level["count"].items():
-                    if value == 0 and key != "0":
-                        check -= 1
-                        message += "【趣味拓展" + key + "阶段没有免费课程】"
+                    count = count + value
             else:
-                if level["count"] <= 0:
-                    check -= 1
-                    message += "【趣味拓展没有除免费课程外的课程】"
-        state = 0  # 趣味拓展不再判断是否有免费课程
+                count = count + level["count"]
+        if count <= 0:
+            message += "【趣味拓展没有配置课程】"
+            state = -1
+        else:
+            message += "【总课程数量：" + str(count) + "】"
+            state = 0
         return state, message
 
     @staticmethod
@@ -711,18 +713,18 @@ class InstallApp:
         # self.expand_button.grid(row=0, column=0)
 
     # ========扩展区域
-    def expand_show(self, event):
-
-        self.height = 520 + 50
-        self.init_window_name.geometry(str(self.width) + 'x' + str(self.height) + '+15+30')
-        self.expand_Label.grid_remove()
-        self.expand_off_Label.grid(row=3, column=0, sticky="E", ipadx=10)
-
-    def expand_close(self, event):
-        self.height = 530
-        self.init_window_name.geometry(str(self.width) + 'x' + str(self.height) + '+15+30')
-        self.expand_off_Label.grid_remove()
-        self.expand_Label.grid(row=3, column=0, sticky="E", ipadx=10)
+    # def expand_show(self, event):
+    #
+    #     self.height = 520 + 50
+    #     self.init_window_name.geometry(str(self.width) + 'x' + str(self.height) + '+15+30')
+    #     self.expand_Label.grid_remove()
+    #     self.expand_off_Label.grid(row=3, column=0, sticky="E", ipadx=10)
+    #
+    # def expand_close(self, event):
+    #     self.height = 530
+    #     self.init_window_name.geometry(str(self.width) + 'x' + str(self.height) + '+15+30')
+    #     self.expand_off_Label.grid_remove()
+    #     self.expand_Label.grid(row=3, column=0, sticky="E", ipadx=10)
 
     # ===========任务列表使用的方法
     def copy_to_clipboard(self, event):
