@@ -684,7 +684,10 @@ class InstallApp:
             for h in input_list:
                 self.input_histroy.insert("", "end", text=h)
         self.input_histroy.bind("<Double-Button-1>", self.click_to_input)
-        self.input_CaptchaNo = Button(self.expand_frame, text="测试线输入验证码", command=self.input_captcha_no)
+        self.input_CaptchaNo_test = Button(self.expand_frame, text="测试线输入验证码", width=15,
+                                           command=lambda: self.input_captcha_no("test"))
+        self.input_CaptchaNo = Button(self.expand_frame, text="正式线输入验证码", width=15, command=self.input_captcha_no)
+        self.input_CaptchaNo_label = Label(self.expand_frame, text="先选手机号再点")
 
     # ========扩展区域
     def expand_show(self, event):
@@ -697,8 +700,10 @@ class InstallApp:
         self.input_Label.grid(row=0, column=0)
         self.input_entry.grid(row=0, column=1)
         self.input_button.grid(row=0, column=2)
-        self.input_histroy.grid(row=1, column=0, columnspan=3, pady=1)
-        self.input_CaptchaNo.grid(row=2, column=0, columnspan=2, sticky="W")
+        self.input_histroy.grid(row=1, column=0, columnspan=4, pady=1)
+        self.input_CaptchaNo_test.grid(row=2, column=0, columnspan=2, sticky="W")
+        self.input_CaptchaNo.grid(row=2, column=1, ipadx=5)
+        self.input_CaptchaNo_label.grid(row=2, column=1, columnspan=2, sticky="E", ipadx=2)
 
     def expand_close(self, event):
         self.height = 530
@@ -734,19 +739,24 @@ class InstallApp:
         text = self.input_histroy.item(item)['text']
         self.devices_manager(name="input", text=text)
 
-    def input_captcha_no(self):
+    def input_captcha_no(self, domain_name=""):
         # 输入验证码
         cur_item = self.input_histroy.focus()
         if not cur_item:
             return
         text = self.input_histroy.item(cur_item)['text']
-        # 没有选中默认第一个
-        url = "https://udb.development.platform.babybus.com/AppSync/GetPhoneCaptcha?Phone=" + text + "&AccountGroupID=1"
-
+        if not domain_name == "test":
+            host = "https://udb.babybus.com"
+        else:
+            host = "https://udb.development.platform.babybus.com"
+        url = host + "/AppSync/GetPhoneCaptcha?Phone=" + text + "&AccountGroupID=1"
         response = requests.request("GET", url)
         res = json.loads(response.text)
         if res["ResultCode"] == "0":
             self.devices_manager(name="input", text=res["Data"]['CaptchaNo'])
+            self.input_CaptchaNo_label.config(text="已输入：" + res["Data"]['CaptchaNo'])
+        else:
+            self.input_CaptchaNo_label.config(text="失败" + text)
 
     # ===========任务列表使用的方法
     def copy_to_clipboard(self, event):
