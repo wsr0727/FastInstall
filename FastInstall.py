@@ -123,17 +123,15 @@ class DefaultCheck:
     # 解压目录，保存在相对路径
     path_cache = "/zip_cache_" + str(int(time.time()))
     # state：-1 失败，0 成功。文件默认不存在
-    result = {"state": -1,
-              "message": "失败",
-              "data": {"image": {"state": 0, "data": 0, "message": "【不判断默认图片是否存在】"},
-                       "package_config_zh": {"state": -1, "message": "【简体中文首页数据文件不存在】", "data": []},
-                       "package_config_lang": {"state": -1, "message": "【国际化语言首页数据文件不存在】", "file_count": 0,
-                                               "random_file": "", "data": []},
-                       "package_config_expand_zh": {"state": -1, "message": "【趣味拓展中文文件不存在】", "file_count": 0,
-                                                    "random_file": "", "data": []},
-                       "package_config_expand_lang": {"state": -1, "message": "【国际化语言趣味拓展文件不存在】", "file_count": 0,
-                                                      "random_file": "", "data": []},
-                       "default_game": {"state": -1, "message": "【内置子包文件不存在】", "data": []}}}
+    result = {"总状态": {"state": -1, "data": 0, "message": "失败"},
+              "内置子包": {"state": -1, "message": "【内置子包文件不存在】", "data": []},
+              "首页数据（简体中文）": {"state": -1, "message": "【简体中文首页数据文件不存在】", "data": []},
+              "首页数据（国际化语言）": {"state": -1, "message": "【国际化语言首页数据文件不存在】", "file_count": 0, "random_file": "",
+                              "data": []},
+              "趣味拓展数据（简体中文）": {"state": -1, "message": "【趣味拓展中文文件不存在】", "file_count": 0,
+                               "random_file": "", "data": []},
+              "趣味拓展数据（国际化语言）": {"state": -1, "message": "【国际化语言趣味拓展文件不存在】", "file_count": 0,
+                                "random_file": "", "data": []}}
 
     def file_format(self):
         """判断文件格式"""
@@ -157,10 +155,6 @@ class DefaultCheck:
             pass
         # 关闭 zip 文件
         zip_file.close()
-
-    def delete_file(self):
-        """删除解压后的文件"""
-        shutil.rmtree(self.path_cache)
 
     def extract_json_data(self, path):
         """读取文件数据"""
@@ -193,76 +187,34 @@ class DefaultCheck:
         """判断默认数据是否正常"""
         package_config_check_result = []
         # grade=0，为体验岛没有选择阶段的课程
-        level_0_result = {"level": "0", "count": {"0": 0, "1": 0, "2": 0, "3": 0, "4": 0}, "error": []}
         level_result = {"level": "", "count": 0, "error": []}
         for level in data["areaData"]:
-            if level["style"]["fieldData"]["level"] == "0":
-                level_0_result_copy = deepcopy(level_0_result)
-                for grade in level["data"]:
-                    if grade["dataCode"] != "ConfigData":
-                        level_0_result_copy["count"][grade['fieldData']["grade"]] += 1
-                        if is_lang:
-                            if any(t["type"] == "mv" for t in grade["fieldData"]["stepConfig"]):
-                                level_0_result_copy["error"].append(
-                                    {"areaDataID": grade["areaDataID"], "id": grade["id"], "title": grade["title"],
-                                     "packageIdent": grade["fieldData"]["packageIdent"],
-                                     "lang": grade["fieldData"]["lang"], "grade": grade["fieldData"]["grade"]})
-                package_config_check_result.append(level_0_result_copy)
-            else:
-                level_result_copy = deepcopy(level_result)
-                level_result_copy["level"] = level["style"]["fieldData"]["level"]
-                for lesson in level["data"]:
-                    level_result_copy["count"] += 1
-                    if is_lang and lesson["dataCode"] != "ConfigData":
-                        if any(t["type"] == "mv" for t in lesson["fieldData"]["stepConfig"]):
-                            level_result_copy["error"].append(
-                                {"areaDataID": lesson["areaDataID"], "id": lesson["id"], "title": lesson["title"],
-                                 "packageIdent": lesson["fieldData"]["packageIdent"],
-                                 "lang": lesson["fieldData"]["lang"]})
-                package_config_check_result.append(level_result_copy)
+            level_result_copy = deepcopy(level_result)
+            level_result_copy["level"] = level["style"]["fieldData"]["level"]
+            for lesson in level["data"]:
+                level_result_copy["count"] += 1
+                if is_lang and lesson["dataCode"] != "ConfigData":
+                    if any(t["type"] == "mv" for t in lesson["fieldData"]["stepConfig"]):
+                        level_result_copy["error"].append(
+                            {"areaDataID": lesson["areaDataID"], "id": lesson["id"], "title": lesson["title"],
+                             "packageIdent": lesson["fieldData"]["packageIdent"],
+                             "lang": lesson["fieldData"]["lang"]})
+            package_config_check_result.append(level_result_copy)
 
         return list(package_config_check_result)
-
-    @staticmethod
-    def package_config_expand_check(data):
-        """判断趣味拓展默认数据是否正常"""
-        package_config_expand_check_result = []
-        # grade=0，为体验岛没有选择阶段的课程
-        expand_0_result = {"level": "趣味拓展-0", "count": {"0": 0, "1": 0, "2": 0, "3": 0, "4": 0},
-                           "error": []}  # 免费课程每个阶段都需要有
-        expand_result = {"level": "趣味拓展", "count": 0, "error": []}
-        for expand in data["areaData"][0]["data"]:  # 只取第一个趣味拓展分类
-            if "grade" in expand["fieldData"] and "priceInfo" in expand["fieldData"]:  # 是否有选阶段，是否有价格信息
-                if expand["fieldData"]["priceInfo"]["priceType"] == 1:
-                    expand_0_result["count"][expand['fieldData']["grade"]] += 1
-            else:
-                expand_result["count"] += 1
-        package_config_expand_check_result.append(expand_0_result)
-        package_config_expand_check_result.append(expand_result)
-        return list(package_config_expand_check_result)
 
     @staticmethod
     def result_state(result):
         message = ""
         check = 0
-        level_0 = -1  # 判断体验岛是否存在
         for l in result:
-            if l["level"] == "0":
-                level_0 += 1
-                for key, value in l["count"].items():
-                    if value == 0 and key != "0":
-                        check -= 1
-                        message += "【体验岛" + key + "阶段没有课程】"
-            else:
-                if l["count"] <= 0:
-                    check -= 1
-                    message += "【level" + l["level"] + "没有课程】"
+            if l["count"] <= 0:
+                check -= 1
+                message += "【level" + l["level"] + "没有课程】"
+
             if l["error"]:
                 check -= 1
                 message += "【level" + l["level"] + "国际化下存在MV环节】"
-        if level_0 == -1:
-            check -= 1
-            message += "【体验岛不存在】"
         if len(result) <= 3:
             check -= 1
             message += "【只有" + str(len(result)) + "个level，检查数量】"
@@ -275,44 +227,37 @@ class DefaultCheck:
         message = ""
         count = 0
         for level in result:
-            if level["level"] == "趣味拓展-0":
-                for key, value in level["count"].items():
-                    count = count + value
-            else:
-                count = count + level["count"]
+            count = count + level["count"]
         if count <= 0:
             message += "【趣味拓展没有配置课程】"
             state = -1
         else:
-            message += "【总课程数量：" + str(count) + "】"
+            message += "【趣味拓展总课程数量：" + str(count) + "】"
             state = 0
         return state, message
 
     @staticmethod
     def final_result(result):
-        state_all = result["data"]["image"]["state"] + result["data"]["package_config_zh"]["state"] + \
-                    result["data"]["package_config_lang"]["state"] + result["data"]["default_game"]["state"] + \
-                    result["data"]["package_config_expand_zh"]["state"] + result["data"]["package_config_expand_lang"][
-                        "state"]
+        state_all = result["首页数据（简体中文）"]["state"] + \
+                    result["首页数据（国际化语言）"]["state"] + result["内置子包"]["state"] + \
+                    result["趣味拓展数据（简体中文）"]["state"] + result["趣味拓展数据（国际化语言）"]["state"]
         state = -1 if state_all < 0 else 0
-        message = result["data"]["image"]["message"] + result["data"]["package_config_zh"]["message"] + \
-                  result["data"]["package_config_lang"]["message"] + result["data"]["default_game"]["message"] + \
-                  result["data"]["package_config_expand_zh"]["message"] + result["data"]["package_config_expand_lang"][
-                      "message"]
+        message = result["首页数据（简体中文）"]["message"] + result["首页数据（国际化语言）"]["message"] + result["内置子包"]["message"] + \
+                  result["趣味拓展数据（简体中文）"]["message"] + result["趣味拓展数据（国际化语言）"]["message"]
         return state, message
 
     def main(self):
         logging.debug("判断文件格式")
         file_format = self.file_format()
         if not file_format:
-            self.result["message"] = "文件格式错误"
+            self.result["总状态"]["message"] = "文件格式错误"
             return self.result
 
         logging.debug("解压文件")
         self.zip_file()
 
         # 组合需要的文件地址
-        image_path_path = self.path_config[file_format]["image_path"]  # 默认图片
+        # image_path_path = self.path_config[file_format]["image_path"]  # 默认图片
         package_config_zh_path = self.path_config[file_format][
                                      "package_config_path"] + 'math_config_zh.json'  # 首页数据-中文
         package_config_lang_path = self.path_config[file_format][
@@ -325,9 +270,6 @@ class DefaultCheck:
 
         default_game_md5_path = self.path_config[file_format]["default_game_path"]  # 默认子包
 
-        logging.debug("判断图片文件是否存在")
-        image_png = self.count_files(self.path_cache + image_path_path, "png")  # 判断默认图片是否存在
-        self.result["data"]["image"].update({"data": image_png, "state": 0, "message": "【不判断默认图片是否存在】"})
         logging.debug("提取文件数据")
         package_config_zh_data = self.extract_json_data(package_config_zh_path)
         package_config_lang_data = self.extract_json_data(package_config_lang_path)
@@ -338,50 +280,49 @@ class DefaultCheck:
         if package_config_zh_data:  # 首页数据-中文
             package_config_zh_result = self.package_config_check(package_config_zh_data)
             state, message = self.result_state(package_config_zh_result)
-            self.result["data"]["package_config_zh"].update(
+            self.result["首页数据（简体中文）"].update(
                 {"data": package_config_zh_result, "state": state, "message": message})
 
         if file_format == "apk":  # 首页数据-多语言
-            self.result["data"]["package_config_lang"].update({"state": 0, "message": "【apk不判断海外(首页数据-多语言）文件】"})
-        else:
-            if package_config_lang_data:  # 首页数据-多语言
-                package_config_lang_result = self.package_config_check(package_config_lang_data, is_lang=True)
-                file_count = self.count_files(self.path_cache + self.path_config[file_format]["package_config_path"],
-                                              "json")
-                self.result["data"]["package_config_lang"].update(
-                    {"file_count": file_count, "random_file": package_config_lang_path.split("/")[-1],
-                     "data": package_config_lang_result})
-                state, message = self.result_state(package_config_lang_result)
-                self.result["data"]["package_config_lang"].update({"state": state, "message": message})
+            self.result["首页数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外(首页数据-多语言）文件】"})
+        elif package_config_lang_data:  # 首页数据-多语言
+            package_config_lang_result = self.package_config_check(package_config_lang_data, is_lang=True)
+            file_count = self.count_files(self.path_cache + self.path_config[file_format]["package_config_path"],
+                                          "json")
+            self.result["首页数据（国际化语言）"].update(
+                {"file_count": file_count, "random_file": package_config_lang_path.split("/")[-1],
+                 "data": package_config_lang_result})
+            state, message = self.result_state(package_config_lang_result)
+            self.result["首页数据（国际化语言）"].update({"state": state, "message": message})
 
         if package_config_expand_zh_data:  # 趣味拓展-中文
-            package_config_expand_zh_result = self.package_config_expand_check(package_config_expand_zh_data)
+            package_config_expand_zh_result = [
+                {"level": "趣味拓展", "count": len(package_config_expand_zh_data["areaData"][0]["data"]), "error": []}]
             state, message = self.expand_result_state(package_config_expand_zh_result)
-            self.result["data"]["package_config_expand_zh"].update(
+            self.result["趣味拓展数据（简体中文）"].update(
                 {"data": package_config_expand_zh_result, "state": state, "message": message})
 
         if file_format == "apk":  # 趣味拓展-多语言
-            self.result["data"]["package_config_expand_lang"].update({"state": 0, "message": "【apk不判断海外（趣味拓展-多语言）文件】"})
-        else:
-            if package_config_expand_lang_data:  # 趣味拓展-多语言
-                package_config_expand_lang_result = self.package_config_expand_check(package_config_expand_lang_data)
-                file_count = self.count_files(
-                    self.path_cache + self.path_config[file_format]["package_config_expand_path"], "json")
-                self.result["data"]["package_config_expand_lang"].update(
-                    {"file_count": file_count, "random_file": package_config_expand_lang_path.split("/")[-1],
-                     "data": package_config_expand_lang_result})
-                state, message = self.expand_result_state(package_config_expand_lang_result)
-                self.result["data"]["package_config_expand_lang"].update({"state": state, "message": message})
+            self.result["趣味拓展数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外（趣味拓展-多语言）文件】"})
+        elif package_config_expand_lang_data:  # 趣味拓展-多语言
+            package_config_expand_lang_result = [
+                {"level": "趣味拓展", "count": len(package_config_expand_lang_data["areaData"][0]["data"]), "error": []}]
+            file_count = self.count_files(
+                self.path_cache + self.path_config[file_format]["package_config_expand_path"], "json")
+            self.result["趣味拓展数据（国际化语言）"].update(
+                {"file_count": file_count, "random_file": package_config_expand_lang_path.split("/")[-1],
+                 "data": package_config_expand_lang_result})
+            state, message = self.expand_result_state(package_config_expand_lang_result)
+            self.result["趣味拓展数据（国际化语言）"].update({"state": state, "message": message})
 
         if default_game_md5_data:
-            self.result["data"]["default_game"].update(
-                {"state": 0, "message": "", "data": default_game_md5_data["item"]})
+            self.result["内置子包"].update({"state": 0, "message": "", "data": default_game_md5_data["item"]})
         logging.debug("编辑结果")
         state, message = self.final_result(self.result)
-        self.result.update({"state": state, "message": message})
+        self.result["总状态"].update({"state": state, "message": message})
 
         logging.debug("删除解压文件缓存")
-        self.delete_file()
+        shutil.rmtree(self.path_cache)  # 删除解压后的文件
         logging.debug(json.dumps(self.result))
         return self.result
 
@@ -743,7 +684,7 @@ class InstallApp:
             for h in input_list:
                 self.input_histroy.insert("", "end", text=h)
         self.input_histroy.bind("<Double-Button-1>", self.click_to_input)
-        self.input_CaptchaNo = Button(self.expand_frame, text="测试线输入验证码", command=self.input_CaptchaNo)
+        self.input_CaptchaNo = Button(self.expand_frame, text="测试线输入验证码", command=self.input_captcha_no)
 
     # ========扩展区域
     def expand_show(self, event):
@@ -770,6 +711,7 @@ class InstallApp:
         self.input_entry.grid_remove()
         self.input_button.grid_remove()
         self.input_histroy.grid_remove()
+        self.input_CaptchaNo.grid_remove()
 
     def input_histroy_list(self, text=""):
         # 处理输入历史的列表
@@ -792,7 +734,7 @@ class InstallApp:
         text = self.input_histroy.item(item)['text']
         self.devices_manager(name="input", text=text)
 
-    def input_CaptchaNo(self):
+    def input_captcha_no(self):
         # 输入验证码
         cur_item = self.input_histroy.focus()
         if not cur_item:
@@ -894,19 +836,7 @@ class InstallApp:
 
         def level_conunt_text(count):
             for i in count:
-                if i["level"] == "0":
-                    level_o_str = {"0": "未选阶段课程", "1": "未入园", "2": "小班", "3": "中班", "4": "大班"}
-                    log_text.insert("end", "体验岛阶段课程数量：" + "\n", "标题")
-                    for key, value in i["count"].items():
-                        log_text.insert("end", level_o_str[key] + ":" + str(value) + "\n")
-                elif i["level"] == "趣味拓展-0":
-                    level_o_str = {"0": "未选阶段课程", "1": "未入园", "2": "小班", "3": "中班", "4": "大班"}
-                    log_text.insert("end", "趣味拓展各阶段免费课程数量：" + "\n", "标题")
-                    for key, value in i["count"].items():
-                        log_text.insert("end", level_o_str[key] + ":" + str(value) + "\n")
-                else:
-                    log_text.insert("end", "阶段-" + i["level"] + "：课程数量 " + str(i["count"]) + "\n")
-
+                log_text.insert("end", "阶段-" + i["level"] + "：课程数量 " + str(i["count"]) + "\n")
                 if i["error"]:
                     log_text.insert("end", "海外存在MV环节的课程：" + str(i["error"]) + "\n")
                 log_text.insert("end", "-" * 20 + "\n", "标题")
@@ -924,53 +854,22 @@ class InstallApp:
         log_text.tag_configure("成功", foreground="green")
         log_text.tag_configure("失败", foreground="red")
 
-        log_text.insert("1.0", "========总状态========\n", "标题")
-        log_text.insert("end", "核验状态：" + state_str(log["state"]), state_str(log["state"]))
-        log_text.insert("end", "   信息：" + log["message"] + "\n")
-
-        log_text.insert("end", "========默认图片========\n", "标题")
-        log_text.insert("end", "核验状态：" + state_str(log["data"]["image"]["state"]),
-                        state_str(log["data"]["image"]["state"]))
-        log_text.insert("end", "  信息：" + log["data"]["image"]["message"] + "  图片数量：" + str(
-            log["data"]["image"]["data"]) + "\n")
-
-        log_text.insert("end", "========默认子包========\n", "标题")
-        log_text.insert("end", "核验状态：" + state_str(log["data"]["default_game"]["state"]),
-                        state_str(log["data"]["default_game"]["state"]))
-        log_text.insert("end", "  信息：" + log["data"]["default_game"]["message"] + "  默认子包信息：" + str(
-            log["data"]["default_game"]["data"]) + "\n")
-
-        log_text.insert("end", "========首页默认数据（简体中文）========\n", "标题")
-        log_text.insert("end", "核验状态：" + state_str(log["data"]["package_config_zh"]["state"]),
-                        state_str(log["data"]["package_config_zh"]["state"]))
-        log_text.insert("end", "   信息：" + log["data"]["package_config_zh"]["message"] + "\n")
-        level_conunt_text(log["data"]["package_config_zh"]["data"])
-
-        log_text.insert("end", "========首页默认数据（国际化语言）========\n", "标题")
-        package_config_lang = log["data"]["package_config_lang"]
-        log_text.insert("end", "核验状态：" + state_str(package_config_lang["state"]),
-                        state_str(package_config_lang["state"]))
-        log_text.insert("end", "   信息：" + package_config_lang["message"] + "\n")
-        if package_config_lang["file_count"] and package_config_lang["random_file"]:
-            log_text.insert("end", "总文件数量：" + str(package_config_lang["file_count"]) + "   " + "抽取的国际化文件：" +
-                            package_config_lang["random_file"] + "\n")
-            level_conunt_text(package_config_lang["data"])
-
-        log_text.insert("end", "========趣味拓展数据（简体中文）========\n", "标题")
-        log_text.insert("end", "核验状态：" + state_str(log["data"]["package_config_expand_zh"]["state"]),
-                        state_str(log["data"]["package_config_expand_zh"]["state"]))
-        log_text.insert("end", "   信息：" + log["data"]["package_config_expand_zh"]["message"] + "\n")
-        level_conunt_text(log["data"]["package_config_expand_zh"]["data"])
-
-        log_text.insert("end", "========趣味拓展数据（国际化语言）========\n", "标题")
-        package_config_expand_lang = log["data"]["package_config_expand_lang"]
-        log_text.insert("end", "核验状态：" + state_str(package_config_expand_lang["state"]),
-                        state_str(package_config_expand_lang["state"]))
-        log_text.insert("end", "   信息：" + package_config_expand_lang["message"] + "\n")
-        if package_config_expand_lang["file_count"] and package_config_expand_lang["random_file"]:
-            log_text.insert("end", "总文件数量：" + str(package_config_expand_lang["file_count"]) + "   " + "抽取的国际化文件：" +
-                            package_config_expand_lang["random_file"] + "\n")
-            level_conunt_text(package_config_expand_lang["data"])
+        for title, content in log.items():
+            log_text.insert("end", "========" + title + "========\n", "标题")
+            for t, c in content.items():
+                if t == "data" and c:
+                    try:
+                        level_conunt_text(c)
+                    except KeyError:
+                        log_text.insert("end", "数据" + "：" + str(c) + "\n")
+                elif t == "state":
+                    log_text.insert("end", "结果" + "：" + state_str(c) + "\n", state_str(c))
+                elif t == "message":
+                    log_text.insert("end", "信息：" + c + "\n")
+                elif t == "file_count":
+                    log_text.insert("end", "文件数量（首页+趣味）" + "：" + str(c) + "\n")
+                elif t == "random_file" and c:
+                    log_text.insert("end", "选取的国际化语言文件" + "：" + str(c) + "\n")
 
         log_text.configure(state="disabled")
 
@@ -986,16 +885,7 @@ class InstallApp:
             self.thread_it(clear_app, task['设备ID'], task['app_id'])
             task_control(app_id=task['app_id'], path=task['app_id'], device=task['设备ID'], status="清空")
         elif '核验' in task['状态']:
-            task_id = task_control(path=task['文件'], status="核验包数据")
-            self.massage_label.config(text="检测默认数据安装包")
-            result = DefaultCheck(task['文件']).main()
-            item_id = self.get_task(task_id)["item_id"]
-            if result["state"] == 0:
-                task_control(task_id=task_id, path=task['文件'], device="", status="核验包成功", log=result, commend=["日志"])
-                self.set_state_tree(item_id, "核验包成功")
-            elif result["state"] == -1:
-                task_control(task_id=task_id, path=task['文件'], device="", status="核验包失败", log=result, commend=["日志"])
-                self.set_state_tree(item_id, "核验包失败")
+            self.default_check(task=task)
 
     def devices_checkbutton(self):
         # 构建复选框
@@ -1085,19 +975,21 @@ class InstallApp:
             if i["序号"] == task_id:
                 return i
 
-    def default_check(self):
-        file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
-        file_list = get_adress(file_path_data)
-
+    def default_check(self, task=None):
+        if not task:
+            file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
+            file_list = get_adress(file_path_data)
+        else:
+            file_list = [task['文件']]
         for index, f in enumerate(file_list):
             task_id = task_control(path=f, status="核验包数据")
             self.massage_label.config(text="检测默认数据，第" + str(index + 1) + "个安装包")
             result = DefaultCheck(f).main()
             item_id = self.get_task(task_id)["item_id"]
-            if result["state"] == 0:
+            if result["总状态"]["state"] == 0:
                 task_control(task_id=task_id, path=f, device="", status="核验包成功", log=result, commend=["日志"])
                 self.set_state_tree(item_id, "核验包成功")
-            elif result["state"] == -1:
+            elif result["总状态"]["state"] == -1:
                 task_control(task_id=task_id, path=f, device="", status="核验包失败", log=result, commend=["日志"])
                 self.set_state_tree(item_id, "核验包失败")
         self.massage_label.config(text="检测默认数据完成")
