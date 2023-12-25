@@ -66,7 +66,7 @@ def cache_set():
             cfg["cache"] = {"input_histroy": []}
             with open("FastInstall.config", "w") as configfile:
                 cfg.write(configfile)
-        input_list_get = cfg.get("cache", "input_histroy")
+        input_list_get = cfg.get("cache", "input_histroy") if cfg.get("cache", "input_histroy") else "[]"
         return app_key_get, eval(input_list_get)
     else:
         # app_key 默认为"com.sinyee.babybus.mathIII"，input_list默认为[]
