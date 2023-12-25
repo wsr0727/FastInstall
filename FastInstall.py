@@ -39,7 +39,7 @@ def config_set(key_value):
             f.write("[app]" + "\n")
             f.write("app_key = com.sinyee.babybus.mathIII" + "\n")
             f.write("[cache]" + "\n")
-            f.write("input_histroy = " + "\n")
+            f.write("input_histroy = []" + "\n")
 
     # 读取config文件的内容
     cfg.read("FastInstall.config")
