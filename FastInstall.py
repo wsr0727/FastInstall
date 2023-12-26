@@ -745,13 +745,15 @@ class InstallApp:
         if not cur_item:
             return
         text = self.input_histroy.item(cur_item)['text']
-        if not domain_name == "test":
-            host = "https://udb.babybus.com"
-        else:
-            host = "https://udb.development.platform.babybus.com"
+        host = "https://udb.babybus.com" if not domain_name == "test" else "https://udb.development.platform.babybus.com"
         url = host + "/AppSync/GetPhoneCaptcha?Phone=" + text + "&AccountGroupID=1"
-        response = requests.request("GET", url)
-        res = json.loads(response.text)
+
+        try:
+            response = requests.request("GET", url)
+            res = json.loads(response.text)
+        except:
+            res = {"ResultCode": -1}
+
         if res["ResultCode"] == "0":
             self.devices_manager(name="input", text=res["Data"]['CaptchaNo'])
             self.input_CaptchaNo_label.config(text="已输入：" + res["Data"]['CaptchaNo'])
