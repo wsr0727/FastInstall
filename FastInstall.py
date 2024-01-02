@@ -38,6 +38,7 @@ def config_set(key_value):
             # 向设置文件写入默认内容
             f.write("[app]" + "\n")
             f.write("app_key = com.sinyee.babybus.mathIII" + "\n")
+            f.write("app_key_histroy = []" + "\n")
             f.write("[cache]" + "\n")
             f.write("input_histroy = []" + "\n")
 
@@ -61,19 +62,24 @@ def cache_set():
         cfg = configparser.ConfigParser()
         cfg.read("FastInstall.config")
         app_key_get = cfg.get("app", "app_key")
+        if not cfg.has_option("app", "app_key_histroy"):
+            cfg["app"] = {"app_key": app_key_get, "app_key_histroy": []}
+            with open("FastInstall.config", "w") as configfile:
+                cfg.write(configfile)
+        app_key_histroy_get = cfg.get("app", "app_key_histroy")
         if not cfg.has_option("cache", "input_histroy"):
             cfg.add_section("cache")
             cfg["cache"] = {"input_histroy": []}
             with open("FastInstall.config", "w") as configfile:
                 cfg.write(configfile)
         input_list_get = cfg.get("cache", "input_histroy") if cfg.get("cache", "input_histroy") else "[]"
-        return app_key_get, eval(input_list_get)
+        return app_key_get, eval(input_list_get), eval(app_key_histroy_get)
     else:
-        # app_key 默认为"com.sinyee.babybus.mathIII"，input_list默认为[]
-        return "com.sinyee.babybus.mathIII", []
+        # app_key 默认为"com.sinyee.babybus.mathIII",app_key_histroy默认为[]，input_list默认为[]
+        return "com.sinyee.babybus.mathIII", [], []
 
 
-app_key, input_list = cache_set()  # 初始化缓存
+app_key, input_list, app_key_histroy = cache_set()  # 初始化缓存
 
 
 class TaskListObserver:
@@ -122,16 +128,6 @@ class DefaultCheck:
                 "default_game_path": "/base/assets/res/subModules/default_game.json"}}
     # 解压目录，保存在相对路径
     path_cache = "/zip_cache_" + str(int(time.time()))
-    # state：-1 失败，0 成功。文件默认不存在
-    result = {"总状态": {"state": -1, "data": 0, "message": "失败"},
-              "内置子包": {"state": -1, "message": "【内置子包文件不存在】", "data": []},
-              "首页数据（简体中文）": {"state": -1, "message": "【简体中文首页数据文件不存在】", "data": []},
-              "首页数据（国际化语言）": {"state": -1, "message": "【国际化语言首页数据文件不存在】", "file_count": 0, "random_file": "",
-                              "data": []},
-              "趣味拓展数据（简体中文）": {"state": -1, "message": "【趣味拓展中文文件不存在】", "file_count": 0,
-                               "random_file": "", "data": []},
-              "趣味拓展数据（国际化语言）": {"state": -1, "message": "【国际化语言趣味拓展文件不存在】", "file_count": 0,
-                                "random_file": "", "data": []}}
 
     def file_format(self):
         """判断文件格式"""
@@ -225,9 +221,7 @@ class DefaultCheck:
     def expand_result_state(result):
         # 趣味拓展不再判断是否有免费课程,只判断课程总数是否大于0
         message = ""
-        count = 0
-        for level in result:
-            count = count + level["count"]
+        count = result[0]["count"]
         if count <= 0:
             message += "【趣味拓展没有配置课程】"
             state = -1
@@ -246,12 +240,36 @@ class DefaultCheck:
                   result["趣味拓展数据（简体中文）"]["message"] + result["趣味拓展数据（国际化语言）"]["message"]
         return state, message
 
+    @staticmethod
+    def expand_count(data):
+        if not data["areaData"]:
+            return 0
+
+        count = 0
+        if "areaTab" in data["areaData"][0].keys():
+            for i in data["areaData"][0]["areaTab"]:
+                count = count + len(i["data"])
+        else:
+            count = len(data["areaData"][0]["data"])
+        return count
+
     def main(self):
+        # state：-1 失败，0 成功。文件默认不存在
+        result = {"总状态": {"state": -1, "data": 0, "message": "失败"},
+                  "内置子包": {"state": -1, "message": "【内置子包文件不存在】", "data": []},
+                  "首页数据（简体中文）": {"state": -1, "message": "【简体中文首页数据文件不存在】", "data": []},
+                  "首页数据（国际化语言）": {"state": -1, "message": "【国际化语言首页数据文件不存在】", "file_count": 0, "random_file": "",
+                                  "data": []},
+                  "趣味拓展数据（简体中文）": {"state": -1, "message": "【趣味拓展中文文件不存在】", "file_count": 0,
+                                   "random_file": "", "data": []},
+                  "趣味拓展数据（国际化语言）": {"state": -1, "message": "【国际化语言趣味拓展文件不存在】", "file_count": 0,
+                                    "random_file": "", "data": []}}
+
         logging.debug("判断文件格式")
         file_format = self.file_format()
         if not file_format:
-            self.result["总状态"]["message"] = "文件格式错误"
-            return self.result
+            result["总状态"]["message"] = "文件格式错误"
+            return result
 
         logging.debug("解压文件")
         self.zip_file()
@@ -280,51 +298,51 @@ class DefaultCheck:
         if package_config_zh_data:  # 首页数据-中文
             package_config_zh_result = self.package_config_check(package_config_zh_data)
             state, message = self.result_state(package_config_zh_result)
-            self.result["首页数据（简体中文）"].update(
+            result["首页数据（简体中文）"].update(
                 {"data": package_config_zh_result, "state": state, "message": message})
 
         if file_format == "apk":  # 首页数据-多语言
-            self.result["首页数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外(首页数据-多语言）文件】"})
+            result["首页数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外(首页数据-多语言）文件】"})
         elif package_config_lang_data:  # 首页数据-多语言
             package_config_lang_result = self.package_config_check(package_config_lang_data, is_lang=True)
             file_count = self.count_files(self.path_cache + self.path_config[file_format]["package_config_path"],
                                           "json")
-            self.result["首页数据（国际化语言）"].update(
+            result["首页数据（国际化语言）"].update(
                 {"file_count": file_count, "random_file": package_config_lang_path.split("/")[-1],
                  "data": package_config_lang_result})
             state, message = self.result_state(package_config_lang_result)
-            self.result["首页数据（国际化语言）"].update({"state": state, "message": message})
+            result["首页数据（国际化语言）"].update({"state": state, "message": message})
 
         if package_config_expand_zh_data:  # 趣味拓展-中文
             package_config_expand_zh_result = [
-                {"level": "趣味拓展", "count": len(package_config_expand_zh_data["areaData"][0]["data"]), "error": []}]
+                {"level": "趣味拓展", "count": self.expand_count(package_config_expand_zh_data), "error": []}]
             state, message = self.expand_result_state(package_config_expand_zh_result)
-            self.result["趣味拓展数据（简体中文）"].update(
+            result["趣味拓展数据（简体中文）"].update(
                 {"data": package_config_expand_zh_result, "state": state, "message": message})
 
         if file_format == "apk":  # 趣味拓展-多语言
-            self.result["趣味拓展数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外（趣味拓展-多语言）文件】"})
+            result["趣味拓展数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外（趣味拓展-多语言）文件】"})
         elif package_config_expand_lang_data:  # 趣味拓展-多语言
             package_config_expand_lang_result = [
-                {"level": "趣味拓展", "count": len(package_config_expand_lang_data["areaData"][0]["data"]), "error": []}]
+                {"level": "趣味拓展", "count": self.expand_count(package_config_expand_lang_data), "error": []}]
             file_count = self.count_files(
                 self.path_cache + self.path_config[file_format]["package_config_expand_path"], "json")
-            self.result["趣味拓展数据（国际化语言）"].update(
+            result["趣味拓展数据（国际化语言）"].update(
                 {"file_count": file_count, "random_file": package_config_expand_lang_path.split("/")[-1],
                  "data": package_config_expand_lang_result})
             state, message = self.expand_result_state(package_config_expand_lang_result)
-            self.result["趣味拓展数据（国际化语言）"].update({"state": state, "message": message})
+            result["趣味拓展数据（国际化语言）"].update({"state": state, "message": message})
 
         if default_game_md5_data:
-            self.result["内置子包"].update({"state": 0, "message": "", "data": default_game_md5_data["item"]})
+            result["内置子包"].update({"state": 0, "message": "", "data": default_game_md5_data["item"]})
         logging.debug("编辑结果")
-        state, message = self.final_result(self.result)
-        self.result["总状态"].update({"state": state, "message": message})
+        state, message = self.final_result(result)
+        result["总状态"].update({"state": state, "message": message})
 
         logging.debug("删除解压文件缓存")
         shutil.rmtree(self.path_cache)  # 删除解压后的文件
-        logging.debug(json.dumps(self.result))
-        return self.result
+        logging.debug(json.dumps(result))
+        return result
 
 
 # 获取devices数量和名称
@@ -421,10 +439,14 @@ def open_app(device, package_name):
     os.popen("adb -s " + device + " shell am start " + package_name + "/com.sinyee.babybus.SplashAct").read()
 
 
-def release_debug(device):
+def release_debug(device, close=False):
     # 开启正式线调试指令
-    logging.debug("【开启正式线调试指令】：" + device)
-    os.popen("adb -s " + device + " shell setprop debug.babybus.app all").read()
+    if not close:
+        logging.debug("【开启正式线调试指令】：" + device)
+        os.popen("adb -s " + device + " shell setprop debug.babybus.app all").read()
+    else:
+        logging.debug("【关闭正式线调试指令】：" + device)
+        os.popen("adb -s " + device + " shell setprop debug.babybus.app none.").read()
 
 
 def clear_app(device, app_key):
@@ -532,25 +554,31 @@ class InstallApp:
         self.app_key_frame.grid(row=1, column=0)
         self.app_key_var = StringVar()
         self.app_key_var.set(app_key)
-        self.app_key_entry = Entry(self.app_key_frame, textvariable=self.app_key_var, width=41)
+        self.app_key_entry = ttk.Combobox(self.app_key_frame, textvariable=self.app_key_var, width=42,
+                                          values=app_key_histroy)
         self.app_key_entry.grid(row=0, column=0)
-        self.app_key_button = Button(self.app_key_frame, text="打开", width=10,
+        self.app_key_entry.bind("<<ComboboxSelected>>", self.app_key_select)
+        self.app_key_button = Button(self.app_key_frame, text="打开", width=8,
                                      command=lambda: self.devices_manager("open"))
         self.app_key_button.grid(row=0, column=1)
-        self.app_key_button = Button(self.app_key_frame, text="设置", width=10,
+        self.app_key_button = Button(self.app_key_frame, text="设置", width=8,
                                      command=lambda: self.app_key_setting(self.app_key_entry.get()))
         self.app_key_button.grid(row=0, column=2)
+
         # 文件地址区域-------------------------------------------------------------
-        self.file_path_frame = LabelFrame(self.install_frame, text="文件地址：")
+        self.file_path_frame = LabelFrame(self.install_frame, text="文件地址（将文件拖入窗口任意位置即可获取文件地址）：")
         self.file_path_frame.grid(row=2, column=0)
-        self.file_label = Label(self.file_path_frame, text="（将文件拖入窗口任意位置即可获取文件地址）")
-        self.file_label.grid(row=0, column=0, sticky="W")
-        # 文本框清空按钮
-        self.clear_button = Button(self.file_path_frame, text="清空", height=1, width=10, command=self.text_clear)
-        self.clear_button.grid(row=0, column=0, sticky="E")
+        self.file_app_button = Button(self.file_path_frame, text="识别包名并设置", width=15, command=self.file_to_app_key)
+        self.file_app_button.grid(row=0, column=0, sticky="W")
+
+        # 核验思维默认数据
+        self.install_button = Button(self.file_path_frame, text="核验思维默认数据", width=15,
+                                     command=lambda: self.thread_it(self.default_check))
+        self.install_button.grid(row=0, column=0, sticky="E")
+
         # 文本框
-        self.file_path_text = Text(self.file_path_frame, width=61, height=4)
-        self.file_path_text.grid(row=1, column=0, padx=5, pady=5, ipadx=5, ipady=5)
+        self.file_path_text = Text(self.file_path_frame, width=64, height=5)
+        self.file_path_text.grid(row=1, column=0)
 
         # 右边-上边区域==============================================================
         # 设备选择区域-------------------------------------------------------------
@@ -568,35 +596,36 @@ class InstallApp:
         # 按钮区域-------------------------------------------------------------
         self.button_frame = Frame(self.install_frame)
         self.button_frame.grid(row=2, column=1, padx=8)
-        self.choose_app_frame = LabelFrame(self.button_frame, text="针对选中设备或文件：")
+        self.choose_app_frame = LabelFrame(self.button_frame, text="应用管理：")
         self.choose_app_frame.grid(row=0, column=0, sticky="N", ipady=2, padx=5)
         # 开始按钮
-        self.install_button = Button(self.choose_app_frame, text="核验思维默认数据", width=22,
-                                     command=lambda: self.thread_it(self.default_check))
-        self.install_button.grid(row=0, column=0)
-        self.install_button = Button(self.choose_app_frame, text="安装", width=22,
+        self.delete_button = Button(self.choose_app_frame, text="卸载应用", width=15,
+                                    command=lambda: self.thread_it(self.devices_manager, "delete"))
+        self.delete_button.grid(row=0, column=0, pady=5)
+        self.delete_button = Button(self.choose_app_frame, text="清空应用缓存", width=15,
+                                    command=lambda: self.thread_it(self.devices_manager, "clear"))
+        self.delete_button.grid(row=0, column=1, pady=5)
+        self.install_button = Button(self.choose_app_frame, text="安装", width=18,
                                      command=lambda: self.thread_it(self.run))
-        self.install_button.grid(row=0, column=1)
+        self.install_button.grid(row=0, column=2)
 
-        self.choose_devices_frame = LabelFrame(self.button_frame, text="针对选中设备或包名：")
+        self.choose_devices_frame = LabelFrame(self.button_frame, text="设备管理：")
         self.choose_devices_frame.grid(row=1, column=0, sticky="N")
 
-        self.debug_button = Button(self.choose_devices_frame, text="开启正式线调试模式", width=21,
+        self.debug_button = Button(self.choose_devices_frame, text="开启调试模式", width=15,
                                    command=lambda: self.thread_it(self.devices_manager, "debug"))
-        self.debug_button.grid(row=0, column=0, pady=5)
-        self.delete_button = Button(self.choose_devices_frame, text="卸载应用", width=15,
-                                    command=lambda: self.thread_it(self.devices_manager, "delete"))
-        self.delete_button.grid(row=0, column=1, pady=5)
-        self.delete_button = Button(self.choose_devices_frame, text="清空应用缓存", width=15,
-                                    command=lambda: self.thread_it(self.devices_manager, "clear"))
-        self.delete_button.grid(row=0, column=2, pady=5)
+        self.debug_button.grid(row=0, column=0, pady=1)
+
+        self.debug_button = Button(self.choose_devices_frame, text="关闭调试模式", width=15,
+                                   command=lambda: self.thread_it(self.devices_manager, "debug_close"))
+        self.debug_button.grid(row=0, column=1, pady=1)
 
         self.setting_button = Button(self.choose_devices_frame, text="打开语言设置", width=15,
                                      command=lambda: self.thread_it(self.devices_manager, "setting"))
-        self.setting_button.grid(row=0, column=3, pady=5)
+        self.setting_button.grid(row=0, column=2, pady=1)
         # 下方区域==============================================================
         self.log_frame = LabelFrame(self.init_window_name, text="任务列表：（默认选中第一个任务）(双击任务可复制文件地址)")
-        self.log_frame.grid(row=2, column=0, columnspan=2)
+        self.log_frame.grid(row=2, column=0, columnspan=2, padx=10)
 
         self.log_button_frame = LabelFrame(self.log_frame, text="操作：")
         self.log_button_frame.grid(row=0, column=1, sticky="N")
@@ -688,6 +717,17 @@ class InstallApp:
                                            command=lambda: self.input_captcha_no("test"))
         self.input_CaptchaNo = Button(self.expand_frame, text="正式线输入验证码", width=15, command=self.input_captcha_no)
         self.input_CaptchaNo_label = Label(self.expand_frame, text="先选手机号再点")
+
+    def file_to_app_key(self):
+        file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
+        if not file_path_data:  # 地址不为空才判断
+            self.massage_label.config(text="文件地址为空")
+            return
+        result = get_app_key(file_path_data)
+        if not result:
+            self.massage_label.config(text="识别失败")
+            return
+        self.app_key_setting(result[1])
 
     # ========扩展区域
     def expand_show(self, event):
@@ -832,11 +872,26 @@ class InstallApp:
         elif commend_tpye == "set_app_key":
             self.app_key_setting(new_app_key=task["app_id"])
 
+    def app_key_select(self, eventObject):
+        # 包名下拉框选择事件
+        self.app_key_setting(self.app_key_entry.get())
+
     def app_key_setting(self, new_app_key):
-        global app_key
+        global app_key, app_key_histroy
         app_key = new_app_key
         self.app_key_var.set(app_key)
         config_set({"app": {"app_key": app_key}})
+
+        if app_key in app_key_histroy:
+            app_key_histroy.remove(app_key)
+
+        app_key_histroy.insert(0, app_key)
+        if len(app_key_histroy) >= 10:
+            app_key_histroy = app_key_histroy[:10]
+        self.app_key_entry['values'] = app_key_histroy
+
+        config_set({"app": {"app_key_histroy": app_key_histroy}})
+        self.massage_label.config(text="已设置包名" + app_key)
 
     @staticmethod
     def show_log(task):
@@ -890,7 +945,7 @@ class InstallApp:
             self.thread_it(self.run_install, task['文件'], [task['设备ID']])
         elif '卸载' in task['状态']:
             self.thread_it(self.devices_manager, "delete")
-        elif '调试' in task['状态']:
+        elif '开启调试' in task['状态']:
             self.thread_it(release_debug, task['设备ID'])
             task_control(device=task['设备ID'], status="开启调试")
         elif '清空' in task['状态']:
@@ -898,6 +953,8 @@ class InstallApp:
             task_control(app_id=task['app_id'], path=task['app_id'], device=task['设备ID'], status="清空")
         elif '核验' in task['状态']:
             self.default_check(task=task)
+        else:
+            self.massage_label.config(text="此任务不支持克隆")
 
     def devices_checkbutton(self):
         # 构建复选框
@@ -961,6 +1018,9 @@ class InstallApp:
             elif name == "debug":
                 self.thread_it(release_debug, d)
                 task_control(device=d, status="开启调试")
+            elif name == "debug_close":
+                self.thread_it(release_debug, d, True)
+                task_control(device=d, status="关闭调试")
             elif name == "clear":
                 self.thread_it(clear_app, d, app_key)
                 task_control(app_id=app_key, device=d, status="清空")
@@ -1079,10 +1139,6 @@ class InstallApp:
         msg = '\n'.join((item.decode("gbk") for item in files))
         self.file_path_text.delete("1.0", "end")
         self.file_path_text.insert("1.0", msg)
-
-    def text_clear(self):
-        # 清空输入框
-        self.file_path_text.delete("1.0", "end")
 
 
 def gui_start():
