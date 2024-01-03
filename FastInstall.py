@@ -115,15 +115,12 @@ class DefaultCheck:
                         'math_config_expand_th.json', 'math_config_expand_vi.json', 'math_config_expand_zht.json']
 
     path_config = {
-        "apk": {"image_path": "/assets/package_config/images/", "package_config_path": "/assets/package_config/",
-                "package_config_expand_path": "/assets/package_config/",
+        "apk": {"package_config_expand_path": "/assets/package_config/",
                 "default_game_path": "/assets/res/subModules/default_game.json"},
-        "ipa": {"image_path": "/Payload/2d_noSuper_education.app/Images",
-                "package_config_path": "/Payload/2d_noSuper_education.app/PackageConfig/",
+        "ipa": {"package_config_path": "/Payload/2d_noSuper_education.app/PackageConfig/",
                 "package_config_expand_path": "/Payload/2d_noSuper_education.app/PackageConfig/",
                 "default_game_path": "/Payload/2d_noSuper_education.app/res/subModules/default_game.json"},
-        "aab": {"image_path": "/base/assets/package_config/images/",
-                "package_config_path": "/base/assets/package_config/",
+        "aab": {"package_config_path": "/base/assets/package_config/",
                 "package_config_expand_path": "/base/assets/package_config/",
                 "default_game_path": "/base/assets/res/subModules/default_game.json"}}
     # 解压目录，保存在相对路径
@@ -182,7 +179,6 @@ class DefaultCheck:
     def package_config_check(data, is_lang=False):
         """判断默认数据是否正常"""
         package_config_check_result = []
-        # grade=0，为体验岛没有选择阶段的课程
         level_result = {"level": "", "count": 0, "error": []}
         for level in data["areaData"]:
             level_result_copy = deepcopy(level_result)
@@ -232,19 +228,19 @@ class DefaultCheck:
 
     @staticmethod
     def final_result(result):
-        state_all = result["首页数据（简体中文）"]["state"] + \
-                    result["首页数据（国际化语言）"]["state"] + result["内置子包"]["state"] + \
-                    result["趣味拓展数据（简体中文）"]["state"] + result["趣味拓展数据（国际化语言）"]["state"]
+        state_all = 0
+        message = ""
+        for s in result.keys():
+            if not s == "总状态":
+                state_all = state_all + result[s]["state"]
+                message = message + result[s]["message"]
         state = -1 if state_all < 0 else 0
-        message = result["首页数据（简体中文）"]["message"] + result["首页数据（国际化语言）"]["message"] + result["内置子包"]["message"] + \
-                  result["趣味拓展数据（简体中文）"]["message"] + result["趣味拓展数据（国际化语言）"]["message"]
         return state, message
 
     @staticmethod
     def expand_count(data):
         if not data["areaData"]:
             return 0
-
         count = 0
         if "areaTab" in data["areaData"][0].keys():
             for i in data["areaData"][0]["areaTab"]:
@@ -252,6 +248,33 @@ class DefaultCheck:
         else:
             count = len(data["areaData"][0]["data"])
         return count
+
+    def course_check(self):
+        path_config = {
+            "apk": {"default_game_path": "/assets/subapp_u2d/default_game.json"}
+        }
+        result = {"总状态": {"state": -1, "data": 0, "message": "失败"},
+                  "内置子包": {"state": -1, "message": "【内置子包文件不存在】", "data": []}
+                  }
+        logging.debug("判断文件格式")
+        file_format = self.file_format()
+        if not file_format:
+            result["总状态"]["message"] = "文件格式错误"
+            return result
+
+        logging.debug("解压文件")
+        self.zip_file()
+        default_game_md5_path = path_config[file_format]["default_game_path"]  # 默认子包
+        default_game_md5_data = self.extract_json_data(default_game_md5_path)
+        if default_game_md5_data:
+            result["内置子包"].update({"state": 0, "message": "", "data": default_game_md5_data["item"]})
+        state, message = self.final_result(result)
+        result["总状态"].update({"state": state, "message": message})
+
+        logging.debug("删除解压文件缓存")
+        shutil.rmtree(self.path_cache)  # 删除解压后的文件
+        logging.debug(json.dumps(result))
+        return result
 
     def main(self):
         # state：-1 失败，0 成功。文件默认不存在
@@ -275,7 +298,6 @@ class DefaultCheck:
         self.zip_file()
 
         # 组合需要的文件地址
-        # image_path_path = self.path_config[file_format]["image_path"]  # 默认图片
         package_config_zh_path = self.path_config[file_format][
                                      "package_config_path"] + 'math_config_zh.json'  # 首页数据-中文
         package_config_lang_path = self.path_config[file_format][
@@ -285,7 +307,6 @@ class DefaultCheck:
         package_config_expand_lang_path = self.path_config[file_format][
                                               "package_config_expand_path"] + random.choice(
             self.expand_lang_path)  # 趣味拓展-多语言
-
         default_game_md5_path = self.path_config[file_format]["default_game_path"]  # 默认子包
 
         logging.debug("提取文件数据")
@@ -440,7 +461,6 @@ def open_app(device, package_name):
 
 
 def release_debug(device, close=False):
-    # 开启正式线调试指令
     if not close:
         logging.debug("【开启正式线调试指令】：" + device)
         os.popen("adb -s " + device + " shell setprop debug.babybus.app all").read()
@@ -450,20 +470,18 @@ def release_debug(device, close=False):
 
 
 def clear_app(device, app_key):
-    # 开启正式线调试指令
     logging.debug("【清空应用缓存】：" + device)
     os.popen("adb -s " + device + " shell pm clear " + app_key).read()
 
 
 def setting_debug(device):
-    # 开启语言设置
     logging.debug("【开启语言设置】：" + device)
     os.popen("adb -s " + device + " shell am start -a android.settings.LOCALE_SETTINGS").read()
 
 
 def task_clear():
     """
-    # 清空任务列表
+    清空任务列表
     """
     global task_list
     task_list.clear()
@@ -571,10 +589,14 @@ class InstallApp:
         self.file_app_button = Button(self.file_path_frame, text="识别包名并设置", width=15, command=self.file_to_app_key)
         self.file_app_button.grid(row=0, column=0, sticky="W")
 
+        self.course_defaule_button = Button(self.file_path_frame, text="科学默认数据", width=10,
+                                            command=lambda: self.thread_it(self.default_check, None, "course"))
+        self.course_defaule_button.grid(row=0, column=0)
+
         # 核验思维默认数据
-        self.install_button = Button(self.file_path_frame, text="核验思维默认数据", width=15,
-                                     command=lambda: self.thread_it(self.default_check))
-        self.install_button.grid(row=0, column=0, sticky="E")
+        self.defaule_check_button = Button(self.file_path_frame, text="核验思维默认数据", width=15,
+                                           command=lambda: self.thread_it(self.default_check))
+        self.defaule_check_button.grid(row=0, column=0, sticky="E")
 
         # 文本框
         self.file_path_text = Text(self.file_path_frame, width=64, height=5)
@@ -1047,16 +1069,26 @@ class InstallApp:
             if i["序号"] == task_id:
                 return i
 
-    def default_check(self, task=None):
+    def default_check(self, task=None, app_name=""):
         if not task:
             file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
             file_list = get_adress(file_path_data)
         else:
             file_list = [task['文件']]
+
+        if not file_list:
+            self.massage_label.config(text="请输入文件地址")
+            return
+
         for index, f in enumerate(file_list):
             task_id = task_control(path=f, status="核验包数据")
             self.massage_label.config(text="检测默认数据，第" + str(index + 1) + "个安装包")
-            result = DefaultCheck(f).main()
+
+            if app_name == "course":
+                result = DefaultCheck(f).course_check()
+            else:
+                result = DefaultCheck(f).main()
+
             item_id = self.get_task(task_id)["item_id"]
             if result["总状态"]["state"] == 0:
                 task_control(task_id=task_id, path=f, device="", status="核验包成功", log=result, commend=["日志"])
