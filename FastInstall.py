@@ -115,7 +115,8 @@ class DefaultCheck:
                         'math_config_expand_th.json', 'math_config_expand_vi.json', 'math_config_expand_zht.json']
 
     path_config = {
-        "apk": {"package_config_expand_path": "/assets/package_config/",
+        "apk": {"package_config_path": "/assets/package_config/",
+                "package_config_expand_path": "/assets/package_config/",
                 "default_game_path": "/assets/res/subModules/default_game.json"},
         "ipa": {"package_config_path": "/Payload/2d_noSuper_education.app/PackageConfig/",
                 "package_config_expand_path": "/Payload/2d_noSuper_education.app/PackageConfig/",
