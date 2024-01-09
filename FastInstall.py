@@ -242,13 +242,27 @@ class DefaultCheck:
     def expand_count(data):
         if not data["areaData"]:
             return 0
-        count = 0
-        if "areaTab" in data["areaData"][0].keys():
-            for i in data["areaData"][0]["areaTab"]:
-                count = count + len(i["data"])
-        else:
-            count = len(data["areaData"][0]["data"])
-        return count
+        count = []
+        count_int = 0
+        hot_num = 0
+        for d in data["areaData"]:
+            count.append({"区域名": d["areaName"], "课程数据": {}})
+            hot_tab = []
+            for i in d["areaTab"]:
+                count[-1]["课程数据"].update({i["style"]["headerTitle"]: len(i["data"])})
+                try:
+                    if i["style"]["fieldData"]["isHot"]:
+                        hot_tab.append(i["style"]["headerTitle"])
+                        hot_num += 1
+                except:
+                    pass
+            if hot_tab:
+                count[-1].update({"热门tab": hot_tab})
+
+        for j in count:
+            for n in j["课程数据"].values():
+                count_int = count_int + n
+        return count, count_int, hot_num
 
     def course_check(self):
         path_config = {
@@ -336,8 +350,9 @@ class DefaultCheck:
             result["首页数据（国际化语言）"].update({"state": state, "message": message})
 
         if package_config_expand_zh_data:  # 趣味拓展-中文
+            data, count, hot_num = self.expand_count(package_config_expand_zh_data)
             package_config_expand_zh_result = [
-                {"level": "趣味拓展", "count": self.expand_count(package_config_expand_zh_data), "error": []}]
+                {"level": "趣味拓展", "count": count, "热门tab总数": hot_num, "data": data}]
             state, message = self.expand_result_state(package_config_expand_zh_result)
             result["趣味拓展数据（简体中文）"].update(
                 {"data": package_config_expand_zh_result, "state": state, "message": message})
@@ -346,7 +361,7 @@ class DefaultCheck:
             result["趣味拓展数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外（趣味拓展-多语言）文件】"})
         elif package_config_expand_lang_data:  # 趣味拓展-多语言
             package_config_expand_lang_result = [
-                {"level": "趣味拓展", "count": self.expand_count(package_config_expand_lang_data), "error": []}]
+                {"level": "趣味拓展", "count": self.expand_count(package_config_expand_lang_data)}]
             file_count = self.count_files(
                 self.path_cache + self.path_config[file_format]["package_config_expand_path"], "json")
             result["趣味拓展数据（国际化语言）"].update(
@@ -931,6 +946,14 @@ class InstallApp:
                     log_text.insert("end", "海外存在MV环节的课程：" + str(i["error"]) + "\n")
                 log_text.insert("end", "-" * 20 + "\n", "标题")
 
+        def expand_conunt_text(count):
+            log_text.insert("end", "热门tab总数:" + str(count[0]["热门tab总数"]) + "\n")
+            log_text.insert("end", "-" * 20 + "\n", "标题")
+            for i in count[0]["data"]:
+                for key in i.keys():
+                    log_text.insert("end", key + "：" + str(i[key]) + "\n")
+                log_text.insert("end", "-" * 20 + "\n", "标题")
+
         log = task["日志"]
         # 创建一个新的Toplevel窗口
         log_top = Toplevel()
@@ -948,10 +971,13 @@ class InstallApp:
             log_text.insert("end", "========" + title + "========\n", "标题")
             for t, c in content.items():
                 if t == "data" and c:
-                    try:
-                        level_conunt_text(c)
-                    except KeyError:
-                        log_text.insert("end", "数据" + "：" + str(c) + "\n")
+                    if "level" in c[0].keys() and c[0]["level"] == "趣味拓展":
+                        expand_conunt_text(c)
+                    else:
+                        try:
+                            level_conunt_text(c)
+                        except KeyError:
+                            log_text.insert("end", "数据" + "：" + str(c) + "\n")
                 elif t == "state":
                     log_text.insert("end", "结果" + "：" + state_str(c) + "\n", state_str(c))
                 elif t == "message":
