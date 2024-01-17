@@ -219,12 +219,18 @@ class DefaultCheck:
         # 趣味拓展不再判断是否有免费课程,只判断课程总数是否大于0
         message = ""
         count = result[0]["count"]
+        check = 0
+        for i in result[0]["data"]:
+            if i.get("无总关卡环节"):
+                check -= 1
+                message += "【趣味拓展存在无总关卡环节】"
+                break
         if count <= 0:
             message += "【趣味拓展没有配置课程】"
-            state = -1
-        else:
-            message += "【趣味拓展总课程数量：" + str(count) + "】"
-            state = 0
+            check -= 1
+        # else:
+        #     message += "【趣味拓展总课程数量：" + str(count) + "】"
+        state = -1 if check < 0 else 0
         return state, message
 
     @staticmethod
@@ -240,28 +246,35 @@ class DefaultCheck:
 
     @staticmethod
     def expand_count(data):
-        if not data["areaData"]:
-            return 0
         count = []
-        count_int = 0
         hot_num = 0
+        count_int = 0
         for d in data["areaData"]:
             count.append({"区域名": d["areaName"], "课程数据": {}})
             hot_tab = []
+            total_stage_error = {}
             for i in d["areaTab"]:
-                count[-1]["课程数据"].update({i["style"]["headerTitle"]: len(i["data"])})
-                try:
-                    if i["style"]["fieldData"]["isHot"]:
-                        hot_tab.append(i["style"]["headerTitle"])
-                        hot_num += 1
-                except:
-                    pass
+                total_stage_empty = []
+                count[-1]["课程数据"].update({i["areaTabName"]: len(i["data"])})
+                for s in i["data"]:
+                    if s["fieldData"].get("totalStage") in {"0", None}:
+                        total_stage_empty.append(str(s["areaDataID"]) + ":" + s["title"])
+
+                if i["style"]["fieldData"].get("isHot"):
+                    hot_tab.append(i["areaTabName"])
+                    hot_num += 1
+
+                if total_stage_empty:
+                    total_stage_error.update({i["areaTabName"]: total_stage_empty})
             if hot_tab:
                 count[-1].update({"热门tab": hot_tab})
+            if total_stage_error:
+                count[-1].update({"无总关卡环节": total_stage_error})
 
         for j in count:
             for n in j["课程数据"].values():
                 count_int = count_int + n
+
         return count, count_int, hot_num
 
     def course_check(self):
@@ -288,6 +301,32 @@ class DefaultCheck:
 
         logging.debug("删除解压文件缓存")
         shutil.rmtree(self.path_cache)  # 删除解压后的文件
+        logging.debug(json.dumps(result))
+        return result
+
+    def expand_json_check(self):
+        # state：-1 失败，0 成功。文件默认不存在
+        result = {"总状态": {"state": -1, "data": 0, "message": "失败"},
+                  "趣味拓展数据（简体中文）": {"state": -1, "message": "【趣味拓展中文文件不存在】", "file_count": 0,
+                                   "random_file": "", "data": []}}
+
+        logging.debug("提取文件数据")
+        with open(self.file_path, "r", encoding="utf-8") as default_file:
+            package_config_expand_zh_data = json.load(default_file)
+
+        if package_config_expand_zh_data:  # 趣味拓展-中文
+            data, count, hot_num = self.expand_count(package_config_expand_zh_data["data"])
+            package_config_expand_zh_result = [
+                {"level": "趣味拓展", "count": count, "热门tab总数": hot_num, "data": data}]
+            state, message = self.expand_result_state(package_config_expand_zh_result)
+            result["趣味拓展数据（简体中文）"].update(
+                {"data": package_config_expand_zh_result, "state": state, "message": message})
+
+        logging.debug("编辑结果")
+        state, message = self.final_result(result)
+        result["总状态"].update({"state": state, "message": message})
+
+        logging.debug("删除解压文件缓存")
         logging.debug(json.dumps(result))
         return result
 
@@ -360,15 +399,13 @@ class DefaultCheck:
         if file_format == "apk":  # 趣味拓展-多语言
             result["趣味拓展数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外（趣味拓展-多语言）文件】"})
         elif package_config_expand_lang_data:  # 趣味拓展-多语言
-            package_config_expand_lang_result = [
-                {"level": "趣味拓展", "count": self.expand_count(package_config_expand_lang_data)}]
+            data, count, hot_num = self.expand_count(package_config_expand_lang_data)
             file_count = self.count_files(
                 self.path_cache + self.path_config[file_format]["package_config_expand_path"], "json")
-            result["趣味拓展数据（国际化语言）"].update(
-                {"file_count": file_count, "random_file": package_config_expand_lang_path.split("/")[-1],
-                 "data": package_config_expand_lang_result})
+            package_config_expand_lang_result = [
+                {"level": "趣味拓展", "count": count, "热门tab总数": hot_num, "data": data}]
             state, message = self.expand_result_state(package_config_expand_lang_result)
-            result["趣味拓展数据（国际化语言）"].update({"state": state, "message": message})
+            result["趣味拓展数据（国际化语言）"].update({"file_count": file_count, "random_file": package_config_expand_lang_path.split("/")[-1],"data": package_config_expand_lang_result, "state": state, "message": message})
 
         if default_game_md5_data:
             result["内置子包"].update({"state": 0, "message": "", "data": default_game_md5_data["item"]})
@@ -431,10 +468,10 @@ def get_adress(adress):
     if os.path.isdir(adress):
         for f in os.listdir(adress):
             # 只装apk
-            if ".apk" in f or ".ipa" in f or ".aab" in f:
+            if ".apk" in f or ".ipa" in f or ".aab" in f or ".json" in f:
                 adress_list.append('{}/{}'.format(adress, f))
     else:
-        adress_list = [item for item in adress.split("\n") if ".apk" in item or ".ipa" in item or ".aab" in item]
+        adress_list = [item for item in adress.split("\n") if ".apk" in item or ".ipa" in item or ".aab" in item or ".json" in item]
     return adress_list
 
 
@@ -735,7 +772,7 @@ class InstallApp:
         self.expand_Label.bind("<Button-1>", self.expand_show)
         self.expand_off_Label.bind("<Button-1>", self.expand_close)
 
-        # 拓展入口开关
+        # 拓展-输入字符
         self.expand_frame = LabelFrame(self.init_window_name, text="指定设备上输入字符：")
         self.input_Label = Label(self.expand_frame, text="内容：")
         self.input_var = StringVar()
@@ -756,6 +793,10 @@ class InstallApp:
         self.input_CaptchaNo = Button(self.expand_frame, text="正式线输入验证码", width=15, command=self.input_captcha_no)
         self.input_CaptchaNo_label = Label(self.expand_frame, text="先选手机号再点")
 
+        # # 拓展-json校验
+        # self.json_check_button = Button(self.init_window_name, text="思维json验证", width=10,
+        #                                 command=lambda: self.thread_it(self.default_check, None, "", "json"))
+
     def file_to_app_key(self):
         file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
         if not file_path_data:  # 地址不为空才判断
@@ -775,6 +816,7 @@ class InstallApp:
         self.expand_off_Label.grid(row=3, column=0, sticky="E", ipadx=10)
 
         self.expand_frame.grid(row=4, column=0, sticky="NW", padx=15)
+        # self.json_check_button.grid(row=4, column=0)
         self.input_Label.grid(row=0, column=0)
         self.input_entry.grid(row=0, column=1)
         self.input_button.grid(row=0, column=2)
@@ -947,6 +989,7 @@ class InstallApp:
                 log_text.insert("end", "-" * 20 + "\n", "标题")
 
         def expand_conunt_text(count):
+            log_text.insert("end", "环节总数:" + str(count[0]["count"]) + "\n")
             log_text.insert("end", "热门tab总数:" + str(count[0]["热门tab总数"]) + "\n")
             log_text.insert("end", "-" * 20 + "\n", "标题")
             for i in count[0]["data"]:
@@ -1096,7 +1139,7 @@ class InstallApp:
             if i["序号"] == task_id:
                 return i
 
-    def default_check(self, task=None, app_name=""):
+    def default_check(self, task=None, app_name="", file_type=""):
         if not task:
             file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
             file_list = get_adress(file_path_data)
@@ -1114,7 +1157,10 @@ class InstallApp:
             if app_name == "course":
                 result = DefaultCheck(f).course_check()
             else:
-                result = DefaultCheck(f).main()
+                if file_type == "json":
+                    result = DefaultCheck(f).expand_json_check()
+                else:
+                    result = DefaultCheck(f).main()
 
             item_id = self.get_task(task_id)["item_id"]
             if result["总状态"]["state"] == 0:
