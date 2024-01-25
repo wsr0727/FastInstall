@@ -789,8 +789,8 @@ class InstallApp:
                 self.input_histroy.insert("", "end", text=h)
         self.input_histroy.bind("<Double-Button-1>", self.click_to_input)
         self.input_CaptchaNo_test = Button(self.expand_frame, text="测试线输入验证码", width=15,
-                                           command=lambda: self.input_captcha_no("test"))
-        self.input_CaptchaNo = Button(self.expand_frame, text="正式线输入验证码", width=15, command=self.input_captcha_no)
+                                           command=lambda: self.thread_it(self.input_captcha_no, "test"))
+        self.input_CaptchaNo = Button(self.expand_frame, text="正式线输入验证码", width=15, command=lambda: self.thread_it(self.input_captcha_no))
         self.input_CaptchaNo_label = Label(self.expand_frame, text="先选手机号再点")
 
         # # 拓展-json校验
@@ -864,6 +864,7 @@ class InstallApp:
         cur_item = self.input_histroy.focus()
         if not cur_item:
             return
+        self.input_CaptchaNo_label.config(text="发送中...")
         text = self.input_histroy.item(cur_item)['text']
         host = "https://udb.babybus.com" if not domain_name == "test" else "https://udb.development.platform.babybus.com"
         url = host + "/AppSync/GetPhoneCaptcha?Phone=" + text + "&AccountGroupID=1"
@@ -873,7 +874,6 @@ class InstallApp:
             res = json.loads(response.text)
         except:
             res = {"ResultCode": -1}
-
         if res["ResultCode"] == "0":
             self.devices_manager(name="input", text=res["Data"]['CaptchaNo'])
             self.input_CaptchaNo_label.config(text="已输入：" + res["Data"]['CaptchaNo'])
