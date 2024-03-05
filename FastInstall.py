@@ -339,7 +339,7 @@ class DefaultCheck:
                   "内置子包":
                       {"state": -1, "message": "【内置子包文件不存在】", "data": []},
                   "内置图片":
-                      {"state": 0, "message": "【内置图片文件夹不存在】", "data": []},
+                      {"state": -1, "message": "【内置图片文件夹不存在】", "data": []},
                   "首页数据（简体中文）":
                       {"state": -1, "message": "【简体中文首页数据文件不存在】", "data": []},
                   "首页数据（国际化语言）":
@@ -394,11 +394,11 @@ class DefaultCheck:
                     {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": i_m_list}], "state": -1,
                      "message": "【音频或内置图片不存在】"})
 
-            if package_config_zh_data:  # 首页数据-中文
-                package_config_zh_result = self.package_config_check(package_config_zh_data)
-                state, message = self.result_state(package_config_zh_result)
-                result["首页数据（简体中文）"].update(
-                    {"data": package_config_zh_result, "state": state, "message": message})
+        if package_config_zh_data:  # 首页数据-中文
+            package_config_zh_result = self.package_config_check(package_config_zh_data)
+            state, message = self.result_state(package_config_zh_result)
+            result["首页数据（简体中文）"].update(
+                {"data": package_config_zh_result, "state": state, "message": message})
 
         if file_format == "apk":  # 首页数据-多语言
             result["首页数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外(首页数据-多语言）文件】"})
