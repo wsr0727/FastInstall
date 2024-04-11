@@ -19,13 +19,12 @@ import requests
 #                     format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
 # 打包指令 pyinstaller -F -w FastInstall.py
-'''
-快速安卓启动卸载
-'''
+
 devices = []  # 当前连接设备
 task_list = []  # 任务列表
 
 
+# ---缓存模块------------------------------------------------
 def config_set(key_value):
     # key_value = {"key": {"app_key": "value"}} 参数格式
     # 初始化设置文件
@@ -80,8 +79,10 @@ def cache_set():
 
 
 app_key, input_list, app_key_histroy = cache_set()  # 初始化缓存
+# ---缓存模块------------------------------------------------
 
 
+# ---任务通知------------------------------------------------
 class TaskListObserver:
     """
     用于观测任务列表是否有变化，有变化时通知所有位置更新
@@ -99,8 +100,10 @@ class TaskListObserver:
 
 
 task_list_observer = TaskListObserver()
+# ---任务通知------------------------------------------------
 
 
+# ---默认数据核验------------------------------------------------
 class DefaultCheck:
     def __init__(self, file_path):
         self.file_path = file_path
@@ -178,6 +181,148 @@ class DefaultCheck:
         """判断文件存在并且不为空"""
         return os.path.exists(file_path) and os.stat(file_path).st_size > 0
 
+    def course_check(self):
+        path_config = {
+            "apk": {"default_game_path": "/assets/subapp_u2d/default_game.json"}
+        }
+        result = {"总状态": {"state": -1, "data": 0, "message": "失败"},
+                  "内置子包": {"state": -1, "message": "【内置子包文件不存在】", "data": []}
+                  }
+        logging.debug("判断文件格式")
+        file_format = self.file_format()
+        if not file_format:
+            result["总状态"]["message"] = "文件格式错误"
+            return result
+
+        logging.debug("解压文件")
+        self.zip_file()
+        default_game_md5_path = path_config[file_format]["default_game_path"]  # 默认子包
+        default_game_md5_data = self.extract_json_data(default_game_md5_path)
+        if default_game_md5_data:
+            result["内置子包"].update({"state": 0, "message": "", "data": default_game_md5_data["item"]})
+        state, message = DateCheck().final_result(result)
+        result["总状态"].update({"state": state, "message": message})
+
+        logging.debug("删除解压文件缓存")
+        shutil.rmtree(self.path_cache)  # 删除解压后的文件
+        logging.debug(json.dumps(result))
+        return result
+
+    def main(self):
+        # state：-1 失败，0 成功。 message: 文件默认不存在
+        result = {"总状态":
+                      {"state": -1, "data": 0, "message": "失败"},
+                  "内置子包":
+                      {"state": -1, "message": "【内置子包文件不存在】", "data": []},
+                  "内置图片":
+                      {"state": -1, "message": "【内置图片文件夹不存在】", "data": []},
+                  "首页数据（简体中文）":
+                      {"state": -1, "message": "【简体中文首页数据文件不存在】", "data": []},
+                  "首页数据（国际化语言）":
+                      {"state": -1, "message": "【国际化语言首页数据文件不存在】", "file_count": 0, "random_file": "",
+                       "data": []},
+                  "趣味拓展数据（简体中文）":
+                      {"state": -1, "message": "【趣味拓展中文文件不存在】", "file_count": 0, "random_file": "",
+                       "data": []},
+                  "趣味拓展数据（国际化语言）":
+                      {"state": -1, "message": "【国际化语言趣味拓展文件不存在】", "file_count": 0, "random_file": "",
+                       "data": []}}
+
+        logging.debug("判断文件格式")
+        file_format = self.file_format()
+        if not file_format:
+            result["总状态"]["message"] = "文件格式错误"
+            return result
+
+        logging.debug("解压文件")
+        self.zip_file()
+
+        # 组合需要的文件地址
+        package_config_zh_path = self.path_config[file_format][
+                                     "package_config_path"] + 'math_config_zh.json'  # 首页数据-中文
+        package_config_lang_path = self.path_config[file_format][
+                                       "package_config_path"] + random.choice(self.lang_path)  # 首页数据-多语言
+        package_config_expand_zh_path = self.path_config[file_format][
+                                            "package_config_expand_path"] + 'math_config_expand_zh.json'  # 趣味拓展-中文
+        package_config_expand_lang_path = self.path_config[file_format][
+                                              "package_config_expand_path"] + random.choice(
+            self.expand_lang_path)  # 趣味拓展-多语言
+        default_game_md5_path = self.path_config[file_format]["default_game_path"]  # 默认子包
+
+        logging.debug("提取文件数据")
+        package_config_zh_data = self.extract_json_data(package_config_zh_path)
+        package_config_lang_data = self.extract_json_data(package_config_lang_path)
+        package_config_expand_zh_data = self.extract_json_data(package_config_expand_zh_path)
+        package_config_expand_lang_data = self.extract_json_data(package_config_expand_lang_path)
+        default_game_md5_data = self.extract_json_data(default_game_md5_path)
+
+        image_path_path = self.path_config[file_format]["image_path"]  # 默认1和许多卡片
+        if file_format != "aab" and self.file_exists(self.path_cache + image_path_path):
+            # 谷歌包不判断默认数据是否存在
+            logging.debug("判断图片文件是否存在")
+            image_png = self.count_files(self.path_cache + image_path_path, "png")  # 判断默认图片是否存在
+            mp3_count = self.count_files(self.path_cache + image_path_path, "mp3")
+            i_m_list = os.listdir(self.path_cache + image_path_path) if os.listdir(
+                self.path_cache + image_path_path) else []
+            if image_png >= 0 and mp3_count >= 0:
+                result["内置图片"].update(
+                    {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": i_m_list}], "state": 0,
+                     "message": ""})
+            elif image_png == -1 or mp3_count == -1:
+                result["内置图片"].update(
+                    {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": i_m_list}], "state": -1,
+                     "message": "【音频或内置图片不存在】"})
+
+        if package_config_zh_data:  # 首页数据-中文
+            package_config_zh_result = DateCheck().package_config_check(package_config_zh_data)
+            state, message = DateCheck().result_state(package_config_zh_result)
+            result["首页数据（简体中文）"].update(
+                {"data": package_config_zh_result, "state": state, "message": message})
+
+        if file_format == "apk":  # 首页数据-多语言
+            result["首页数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外(首页数据-多语言）文件】"})
+        elif package_config_lang_data:  # 首页数据-多语言
+            package_config_lang_result = DateCheck().package_config_check(package_config_lang_data, is_lang=True)
+            file_count = self.count_files(self.path_cache + self.path_config[file_format]["package_config_path"],
+                                          "json")
+            result["首页数据（国际化语言）"].update(
+                {"file_count": file_count, "random_file": package_config_lang_path.split("/")[-1],
+                 "data": package_config_lang_result})
+            state, message = DateCheck().result_state(package_config_lang_result)
+            result["首页数据（国际化语言）"].update({"state": state, "message": message})
+
+        if package_config_expand_zh_data:  # 趣味拓展-中文
+            package_config_expand_zh_result = DateCheck().expand_config_check(package_config_expand_zh_data)
+            state, message = DateCheck().expand_result_state(package_config_expand_zh_result)
+            result["趣味拓展数据（简体中文）"].update(
+                {"data": package_config_expand_zh_result, "state": state, "message": message})
+
+        if file_format == "apk":  # 趣味拓展-多语言
+            result["趣味拓展数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外（趣味拓展-多语言）文件】"})
+        elif package_config_expand_lang_data:  # 趣味拓展-多语言
+            file_count = self.count_files(
+                self.path_cache + self.path_config[file_format]["package_config_expand_path"], "json")
+            package_config_expand_lang_result = DateCheck().expand_config_check(package_config_expand_lang_data)
+            state, message = DateCheck().expand_result_state(package_config_expand_lang_result)
+            result["趣味拓展数据（国际化语言）"].update(
+                {"file_count": file_count, "random_file": package_config_expand_lang_path.split("/")[-1],
+                 "data": package_config_expand_lang_result, "state": state, "message": message})
+
+        if default_game_md5_data:
+            result["内置子包"].update({"state": 0, "message": "", "data": default_game_md5_data["item"]})
+        logging.debug("编辑结果")
+        state, message = DateCheck().final_result(result)
+        result["总状态"].update({"state": state, "message": message})
+
+        logging.debug("删除解压文件缓存")
+        shutil.rmtree(self.path_cache)  # 删除解压后的文件
+        logging.debug(json.dumps(result))
+        return result
+# ---默认数据核验------------------------------------------------
+
+
+# ----数据正确性校验---------------------------------------------------
+class DateCheck:
     @staticmethod
     def package_config_check(data, is_lang=False):
         """判断默认数据是否正常"""
@@ -247,7 +392,7 @@ class DefaultCheck:
         return state, message
 
     @staticmethod
-    def expand_count(data):
+    def expand_config_check(data):
         count = []
         hot_num = 0
         count_int = 0
@@ -277,174 +422,13 @@ class DefaultCheck:
             for n in j["课程数据"].values():
                 count_int = count_int + n
 
-        return count, count_int, hot_num
-
-    def course_check(self):
-        path_config = {
-            "apk": {"default_game_path": "/assets/subapp_u2d/default_game.json"}
-        }
-        result = {"总状态": {"state": -1, "data": 0, "message": "失败"},
-                  "内置子包": {"state": -1, "message": "【内置子包文件不存在】", "data": []}
-                  }
-        logging.debug("判断文件格式")
-        file_format = self.file_format()
-        if not file_format:
-            result["总状态"]["message"] = "文件格式错误"
-            return result
-
-        logging.debug("解压文件")
-        self.zip_file()
-        default_game_md5_path = path_config[file_format]["default_game_path"]  # 默认子包
-        default_game_md5_data = self.extract_json_data(default_game_md5_path)
-        if default_game_md5_data:
-            result["内置子包"].update({"state": 0, "message": "", "data": default_game_md5_data["item"]})
-        state, message = self.final_result(result)
-        result["总状态"].update({"state": state, "message": message})
-
-        logging.debug("删除解压文件缓存")
-        shutil.rmtree(self.path_cache)  # 删除解压后的文件
-        logging.debug(json.dumps(result))
-        return result
-
-    def expand_json_check(self):
-        # state：-1 失败，0 成功。文件默认不存在
-        result = {"总状态": {"state": -1, "data": 0, "message": "失败"},
-                  "趣味拓展数据（简体中文）":
-                      {"state": -1, "message": "【趣味拓展中文文件不存在】", "file_count": 0,"random_file": "", "data": []}}
-
-        logging.debug("提取文件数据")
-        with open(self.file_path, "r", encoding="utf-8") as default_file:
-            package_config_expand_zh_data = json.load(default_file)
-
-        if package_config_expand_zh_data:  # 趣味拓展-中文
-            data, count, hot_num = self.expand_count(package_config_expand_zh_data["data"])
-            package_config_expand_zh_result = [
-                {"level": "趣味拓展", "count": count, "热门tab总数": hot_num, "data": data}]
-            state, message = self.expand_result_state(package_config_expand_zh_result)
-            result["趣味拓展数据（简体中文）"].update(
-                {"data": package_config_expand_zh_result, "state": state, "message": message})
-
-        logging.debug("编辑结果")
-        state, message = self.final_result(result)
-        result["总状态"].update({"state": state, "message": message})
-
-        logging.debug("删除解压文件缓存")
-        logging.debug(json.dumps(result))
-        return result
-
-    def main(self):
-        # state：-1 失败，0 成功。 message: 文件默认不存在
-        result = {"总状态":
-                      {"state": -1, "data": 0, "message": "失败"},
-                  "内置子包":
-                      {"state": -1, "message": "【内置子包文件不存在】", "data": []},
-                  "内置图片":
-                      {"state": -1, "message": "【内置图片文件夹不存在】", "data": []},
-                  "首页数据（简体中文）":
-                      {"state": -1, "message": "【简体中文首页数据文件不存在】", "data": []},
-                  "首页数据（国际化语言）":
-                      {"state": -1, "message": "【国际化语言首页数据文件不存在】", "file_count": 0, "random_file": "", "data": []},
-                  "趣味拓展数据（简体中文）":
-                      {"state": -1, "message": "【趣味拓展中文文件不存在】", "file_count": 0,"random_file": "", "data": []},
-                  "趣味拓展数据（国际化语言）":
-                      {"state": -1, "message": "【国际化语言趣味拓展文件不存在】","file_count": 0, "random_file": "", "data": []}}
-
-        logging.debug("判断文件格式")
-        file_format = self.file_format()
-        if not file_format:
-            result["总状态"]["message"] = "文件格式错误"
-            return result
-
-        logging.debug("解压文件")
-        self.zip_file()
-
-        # 组合需要的文件地址
-        package_config_zh_path = self.path_config[file_format][
-                                     "package_config_path"] + 'math_config_zh.json'  # 首页数据-中文
-        package_config_lang_path = self.path_config[file_format][
-                                       "package_config_path"] + random.choice(self.lang_path)  # 首页数据-多语言
-        package_config_expand_zh_path = self.path_config[file_format][
-                                            "package_config_expand_path"] + 'math_config_expand_zh.json'  # 趣味拓展-中文
-        package_config_expand_lang_path = self.path_config[file_format][
-                                              "package_config_expand_path"] + random.choice(
-            self.expand_lang_path)  # 趣味拓展-多语言
-        default_game_md5_path = self.path_config[file_format]["default_game_path"]  # 默认子包
-
-        logging.debug("提取文件数据")
-        package_config_zh_data = self.extract_json_data(package_config_zh_path)
-        package_config_lang_data = self.extract_json_data(package_config_lang_path)
-        package_config_expand_zh_data = self.extract_json_data(package_config_expand_zh_path)
-        package_config_expand_lang_data = self.extract_json_data(package_config_expand_lang_path)
-        default_game_md5_data = self.extract_json_data(default_game_md5_path)
-
-        image_path_path = self.path_config[file_format]["image_path"]  # 默认1和许多卡片
-        if file_format != "aab" and self.file_exists(self.path_cache + image_path_path):
-            # 谷歌包不判断默认数据是否存在
-            logging.debug("判断图片文件是否存在")
-            image_png = self.count_files(self.path_cache + image_path_path, "png")  # 判断默认图片是否存在
-            mp3_count = self.count_files(self.path_cache + image_path_path, "mp3")
-            i_m_list = os.listdir(self.path_cache + image_path_path) if os.listdir(
-                self.path_cache + image_path_path) else []
-            if image_png >= 0 and mp3_count >= 0:
-                result["内置图片"].update(
-                    {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": i_m_list}], "state": 0,
-                     "message": ""})
-            elif image_png == -1 or mp3_count == -1:
-                result["内置图片"].update(
-                    {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": i_m_list}], "state": -1,
-                     "message": "【音频或内置图片不存在】"})
-
-        if package_config_zh_data:  # 首页数据-中文
-            package_config_zh_result = self.package_config_check(package_config_zh_data)
-            state, message = self.result_state(package_config_zh_result)
-            result["首页数据（简体中文）"].update(
-                {"data": package_config_zh_result, "state": state, "message": message})
-
-        if file_format == "apk":  # 首页数据-多语言
-            result["首页数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外(首页数据-多语言）文件】"})
-        elif package_config_lang_data:  # 首页数据-多语言
-            package_config_lang_result = self.package_config_check(package_config_lang_data, is_lang=True)
-            file_count = self.count_files(self.path_cache + self.path_config[file_format]["package_config_path"],
-                                          "json")
-            result["首页数据（国际化语言）"].update(
-                {"file_count": file_count, "random_file": package_config_lang_path.split("/")[-1],
-                 "data": package_config_lang_result})
-            state, message = self.result_state(package_config_lang_result)
-            result["首页数据（国际化语言）"].update({"state": state, "message": message})
-
-        if package_config_expand_zh_data:  # 趣味拓展-中文
-            data, count, hot_num = self.expand_count(package_config_expand_zh_data)
-            package_config_expand_zh_result = [
-                {"level": "趣味拓展", "count": count, "热门tab总数": hot_num, "data": data}]
-            state, message = self.expand_result_state(package_config_expand_zh_result)
-            result["趣味拓展数据（简体中文）"].update(
-                {"data": package_config_expand_zh_result, "state": state, "message": message})
-
-        if file_format == "apk":  # 趣味拓展-多语言
-            result["趣味拓展数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外（趣味拓展-多语言）文件】"})
-        elif package_config_expand_lang_data:  # 趣味拓展-多语言
-            data, count, hot_num = self.expand_count(package_config_expand_lang_data)
-            file_count = self.count_files(
-                self.path_cache + self.path_config[file_format]["package_config_expand_path"], "json")
-            package_config_expand_lang_result = [
-                {"level": "趣味拓展", "count": count, "热门tab总数": hot_num, "data": data}]
-            state, message = self.expand_result_state(package_config_expand_lang_result)
-            result["趣味拓展数据（国际化语言）"].update(
-                {"file_count": file_count, "random_file": package_config_expand_lang_path.split("/")[-1],
-                 "data": package_config_expand_lang_result, "state": state, "message": message})
-
-        if default_game_md5_data:
-            result["内置子包"].update({"state": 0, "message": "", "data": default_game_md5_data["item"]})
-        logging.debug("编辑结果")
-        state, message = self.final_result(result)
-        result["总状态"].update({"state": state, "message": message})
-
-        logging.debug("删除解压文件缓存")
-        shutil.rmtree(self.path_cache)  # 删除解压后的文件
-        logging.debug(json.dumps(result))
-        return result
+        package_config_expand_zh_result = [
+            {"level": "趣味拓展", "count": count_int, "热门tab总数": hot_num, "data": count}]
+        return package_config_expand_zh_result
+# ----数据正确性校验---------------------------------------------------
 
 
+# ---adb相关方法-----------------------------------------------
 # 获取devices数量和名称
 def get_devices_all():
     global devices
@@ -557,8 +541,10 @@ def clear_app(device, app_key):
 def setting_debug(device):
     logging.debug("【开启语言设置】：" + device)
     os.popen("adb -s " + device + " shell am start -a android.settings.LOCALE_SETTINGS").read()
+# ---adb相关方法-----------------------------------------------
 
 
+# ---任务列表管理-----------------------------------------------
 def task_clear():
     """
     清空任务列表
@@ -616,8 +602,10 @@ def task_control(path=None, device="", status="未开始", app_id=None, task_id=
     task_list_observer.notify()  # 通知任务列表已更新
 
     return task_id
+# ---任务列表管理-----------------------------------------------
 
 
+# ---界面UI-----------------------------------------------
 class InstallApp:
     def __init__(self, init_window_name):
         self.init_window_name = init_window_name
@@ -1275,12 +1263,15 @@ class InstallApp:
         msg = '\n'.join((item.decode("gbk") for item in files))
         self.file_path_text.delete("1.0", "end")
         self.file_path_text.insert("1.0", msg)
+# ---界面UI-----------------------------------------------
 
 
+# ---启动程序-----------------------------------------------
 def gui_start():
     init_window = Tk()  # 实例化出一个父窗口
     InstallApp(init_window)
     init_window.mainloop()
+# ---启动程序-----------------------------------------------
 
 
 if __name__ == '__main__':
