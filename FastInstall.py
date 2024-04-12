@@ -321,6 +321,24 @@ class DefaultCheck:
 # ---默认数据核验------------------------------------------------
 
 
+# ---接口数据核验-----------------------------------------------
+class RequestCheck:
+
+    def task_control(self, platform, version, language, environment, country, url_type):
+        """
+
+        :param url_type:
+        :param platform:
+        :param version:
+        :param language:
+        :param environment:
+        :param country:
+        :return:
+        """
+        return True
+# ---接口数据核验-----------------------------------------------
+
+
 # ----数据正确性校验---------------------------------------------------
 class DateCheck:
     @staticmethod
@@ -533,6 +551,15 @@ def release_debug(device, close=False):
         os.popen("adb -s " + device + " shell setprop debug.babybus.app none.").read()
 
 
+def ad_debug(device, close=False):
+    if not close:
+        logging.debug("【开启正式线广告日志指令】：" + device)
+        os.popen("adb -s " + device + " shell setprop debug.babybusadenablelog 1").read()
+    else:
+        logging.debug("【关闭正式线广告日志指令】：" + device)
+        os.popen("adb -s " + device + " shell setprop debug.babybusadenablelog none.").read()
+
+
 def clear_app(device, app_key):
     logging.debug("【清空应用缓存】：" + device)
     os.popen("adb -s " + device + " shell pm clear " + app_key).read()
@@ -715,6 +742,10 @@ class InstallApp:
         self.setting_button = Button(self.choose_devices_frame, text="打开语言设置", width=15,
                                      command=lambda: self.thread_it(self.devices_manager, "setting"))
         self.setting_button.grid(row=0, column=2, pady=1)
+
+        self.setting_button = Button(self.choose_devices_frame, text="打开广告日志", width=14,
+                                     command=lambda: self.thread_it(self.devices_manager, "ad_debug"))
+        self.setting_button.grid(row=0, column=3, pady=1)
         # 下方区域==============================================================
         self.log_frame = LabelFrame(self.init_window_name, text="任务列表：（默认选中第一个任务）(双击任务可复制文件地址)")
         self.log_frame.grid(row=2, column=0, columnspan=2, padx=10)
@@ -1150,6 +1181,9 @@ class InstallApp:
                     task_control(app_id=app_key, device=d, status="设备上无包")
             elif name == "open":
                 open_app(d, self.app_key_entry.get())
+            elif name == "ad_debug":
+                self.thread_it(ad_debug, d)
+                task_control(device=d, status="开启ad日志")
 
     @staticmethod
     def get_task(task_id):
