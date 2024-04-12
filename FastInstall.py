@@ -1,88 +1,25 @@
-import os
-import time
-import logging
-import zipfile
-import shutil
 from tkinter import *
 import windnd
-import tkinter.scrolledtext as ScrolledText
 import threading
-import random
 import json
 from copy import deepcopy
-import configparser
 from tkinter import ttk
 import requests
-
+import DataRequester
+from DefaultCheck import DefaultCheck
+from AdbCommand import *
+from Cache import *
+from FrameUI import *
 # 日志设置
 # logging.basicConfig(filename='test.log', level=logging.DEBUG,
 #                     format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
 # 打包指令 pyinstaller -F -w FastInstall.py
 
-devices = []  # 当前连接设备
+devices = get_devices_all()
 task_list = []  # 任务列表
 
 
-# ---缓存模块------------------------------------------------
-def config_set(key_value):
-    # key_value = {"key": {"app_key": "value"}} 参数格式
-    # 初始化设置文件
-
-    # 创建一个解析器对象
-    cfg = configparser.ConfigParser()
-    if not os.path.exists("FastInstall.config"):
-        # 如果没有，创建一个新文件
-        with open("FastInstall.config", "w") as f:
-            # 向设置文件写入默认内容
-            f.write("[app]" + "\n")
-            f.write("app_key = com.sinyee.babybus.mathIII" + "\n")
-            f.write("app_key_histroy = []" + "\n")
-            f.write("[cache]" + "\n")
-            f.write("input_histroy = []" + "\n")
-
-    # 读取config文件的内容
-    cfg.read("FastInstall.config")
-
-    logging.debug("设置默认值：" + str(key_value))
-    for i in key_value.keys():
-        for j in key_value[i]:
-            cfg.set(i, j, str(key_value[i][j]))
-
-    # 保存修改
-    with open("FastInstall.config", "w") as f:
-        cfg.write(f)
-        logging.debug("保存默认文件的修改")
-
-
-def cache_set():
-    # 初始化缓存数据
-    if os.path.exists("FastInstall.config"):
-        cfg = configparser.ConfigParser()
-        cfg.read("FastInstall.config")
-        app_key_get = cfg.get("app", "app_key")
-        if not cfg.has_option("app", "app_key_histroy"):
-            cfg["app"] = {"app_key": app_key_get, "app_key_histroy": []}
-            with open("FastInstall.config", "w") as configfile:
-                cfg.write(configfile)
-        app_key_histroy_get = cfg.get("app", "app_key_histroy")
-        if not cfg.has_option("cache", "input_histroy"):
-            cfg.add_section("cache")
-            cfg["cache"] = {"input_histroy": []}
-            with open("FastInstall.config", "w") as configfile:
-                cfg.write(configfile)
-        input_list_get = cfg.get("cache", "input_histroy") if cfg.get("cache", "input_histroy") else "[]"
-        return app_key_get, eval(input_list_get), eval(app_key_histroy_get)
-    else:
-        # app_key 默认为"com.sinyee.babybus.mathIII",app_key_histroy默认为[]，input_list默认为[]
-        return "com.sinyee.babybus.mathIII", [], []
-
-
-app_key, input_list, app_key_histroy = cache_set()  # 初始化缓存
-# ---缓存模块------------------------------------------------
-
-
-# ---任务通知------------------------------------------------
 class TaskListObserver:
     """
     用于观测任务列表是否有变化，有变化时通知所有位置更新
@@ -100,478 +37,8 @@ class TaskListObserver:
 
 
 task_list_observer = TaskListObserver()
-# ---任务通知------------------------------------------------
 
 
-# ---默认数据核验------------------------------------------------
-class DefaultCheck:
-    def __init__(self, file_path):
-        self.file_path = file_path
-
-    lang_path = ['math_config_ar.json', 'math_config_en.json', 'math_config_es.json', 'math_config_fr.json',
-                 'math_config_id.json', 'math_config_ja.json', 'math_config_ko.json', 'math_config_pt.json',
-                 'math_config_ru.json', 'math_config_th.json', 'math_config_vi.json', 'math_config_zht.json']
-
-    expand_lang_path = ['math_config_expand_ar.json', 'math_config_expand_en.json', 'math_config_expand_es.json',
-                        'math_config_expand_fr.json', 'math_config_expand_id.json', 'math_config_expand_ja.json',
-                        'math_config_expand_ko.json', 'math_config_expand_pt.json', 'math_config_expand_ru.json',
-                        'math_config_expand_th.json', 'math_config_expand_vi.json', 'math_config_expand_zht.json']
-
-    path_config = {
-        "apk": {"image_path": "/assets/package_config/images/", "package_config_path": "/assets/package_config/",
-                "package_config_expand_path": "/assets/package_config/",
-                "default_game_path": "/assets/res/subModules/default_game.json"},
-        "ipa": {"image_path": "/Payload/2d_noSuper_education.app/Images",
-                "package_config_path": "/Payload/2d_noSuper_education.app/PackageConfig/",
-                "package_config_expand_path": "/Payload/2d_noSuper_education.app/PackageConfig/",
-                "default_game_path": "/Payload/2d_noSuper_education.app/res/subModules/default_game.json"},
-        "aab": {"image_path": "/base/assets/package_config/images/",
-                "package_config_path": "/base/assets/package_config/",
-                "package_config_expand_path": "/base/assets/package_config/",
-                "default_game_path": "/base/assets/res/subModules/default_game.json"}}
-    # 解压目录，保存在相对路径
-    path_cache = "/zip_cache_" + str(int(time.time()))
-
-    def file_format(self):
-        """判断文件格式"""
-        file_format = [".apk", ".ipa", ".aab"]
-        for f in file_format:
-            if self.file_path.endswith(f):
-                return f.replace(".", "")
-        return False
-
-    def zip_file(self):
-        """解压文件"""
-        # 创建 ZipFile 实例对象
-        zip_file = zipfile.ZipFile(self.file_path)
-        # 创建目录
-        os.mkdir(self.path_cache)
-        # 提取 zip 文件
-        try:
-            zip_file.extractall(self.path_cache)
-            # 解压resources.arsc文件时会出错，只有打包出来的文件有问题，暂时没有解决办法
-        except:
-            pass
-        # 关闭 zip 文件
-        zip_file.close()
-
-    def extract_json_data(self, path):
-        """读取文件数据"""
-        if self.file_exists(self.path_cache + path):  # 先判断文件存在且不为空
-            with open(self.path_cache + path, "r", encoding="utf-8") as default_file:
-                data = json.load(default_file)
-            return data
-        else:
-            return {}
-
-    @staticmethod
-    def count_files(dir_path: str, extension: str):
-        """判断文件夹内某个后缀的文件有多少个"""
-        if os.path.isdir(dir_path):
-            files = os.listdir(dir_path)
-            count_files = [file for file in files if file.endswith('.' + extension)]
-            logging.debug(str(files) + "文件内文件数量：" + extension + "：" + str(len(count_files)))
-            return len(count_files)
-        else:
-            logging.debug("文件目录不存在")
-            return -1
-
-    @staticmethod
-    def file_exists(file_path: str):
-        """判断文件存在并且不为空"""
-        return os.path.exists(file_path) and os.stat(file_path).st_size > 0
-
-    def course_check(self):
-        path_config = {
-            "apk": {"default_game_path": "/assets/subapp_u2d/default_game.json"}
-        }
-        result = {"总状态": {"state": -1, "data": 0, "message": "失败"},
-                  "内置子包": {"state": -1, "message": "【内置子包文件不存在】", "data": []}
-                  }
-        logging.debug("判断文件格式")
-        file_format = self.file_format()
-        if not file_format:
-            result["总状态"]["message"] = "文件格式错误"
-            return result
-
-        logging.debug("解压文件")
-        self.zip_file()
-        default_game_md5_path = path_config[file_format]["default_game_path"]  # 默认子包
-        default_game_md5_data = self.extract_json_data(default_game_md5_path)
-        if default_game_md5_data:
-            result["内置子包"].update({"state": 0, "message": "", "data": default_game_md5_data["item"]})
-        state, message = DateCheck().final_result(result)
-        result["总状态"].update({"state": state, "message": message})
-
-        logging.debug("删除解压文件缓存")
-        shutil.rmtree(self.path_cache)  # 删除解压后的文件
-        logging.debug(json.dumps(result))
-        return result
-
-    def main(self):
-        # state：-1 失败，0 成功。 message: 文件默认不存在
-        result = {"总状态":
-                      {"state": -1, "data": 0, "message": "失败"},
-                  "内置子包":
-                      {"state": -1, "message": "【内置子包文件不存在】", "data": []},
-                  "内置图片":
-                      {"state": -1, "message": "【内置图片文件夹不存在】", "data": []},
-                  "首页数据（简体中文）":
-                      {"state": -1, "message": "【简体中文首页数据文件不存在】", "data": []},
-                  "首页数据（国际化语言）":
-                      {"state": -1, "message": "【国际化语言首页数据文件不存在】", "file_count": 0, "random_file": "",
-                       "data": []},
-                  "趣味拓展数据（简体中文）":
-                      {"state": -1, "message": "【趣味拓展中文文件不存在】", "file_count": 0, "random_file": "",
-                       "data": []},
-                  "趣味拓展数据（国际化语言）":
-                      {"state": -1, "message": "【国际化语言趣味拓展文件不存在】", "file_count": 0, "random_file": "",
-                       "data": []}}
-
-        logging.debug("判断文件格式")
-        file_format = self.file_format()
-        if not file_format:
-            result["总状态"]["message"] = "文件格式错误"
-            return result
-
-        logging.debug("解压文件")
-        self.zip_file()
-
-        # 组合需要的文件地址
-        package_config_zh_path = self.path_config[file_format][
-                                     "package_config_path"] + 'math_config_zh.json'  # 首页数据-中文
-        package_config_lang_path = self.path_config[file_format][
-                                       "package_config_path"] + random.choice(self.lang_path)  # 首页数据-多语言
-        package_config_expand_zh_path = self.path_config[file_format][
-                                            "package_config_expand_path"] + 'math_config_expand_zh.json'  # 趣味拓展-中文
-        package_config_expand_lang_path = self.path_config[file_format][
-                                              "package_config_expand_path"] + random.choice(
-            self.expand_lang_path)  # 趣味拓展-多语言
-        default_game_md5_path = self.path_config[file_format]["default_game_path"]  # 默认子包
-
-        logging.debug("提取文件数据")
-        package_config_zh_data = self.extract_json_data(package_config_zh_path)
-        package_config_lang_data = self.extract_json_data(package_config_lang_path)
-        package_config_expand_zh_data = self.extract_json_data(package_config_expand_zh_path)
-        package_config_expand_lang_data = self.extract_json_data(package_config_expand_lang_path)
-        default_game_md5_data = self.extract_json_data(default_game_md5_path)
-
-        image_path_path = self.path_config[file_format]["image_path"]  # 默认1和许多卡片
-        if file_format != "aab" and self.file_exists(self.path_cache + image_path_path):
-            # 谷歌包不判断默认数据是否存在
-            logging.debug("判断图片文件是否存在")
-            image_png = self.count_files(self.path_cache + image_path_path, "png")  # 判断默认图片是否存在
-            mp3_count = self.count_files(self.path_cache + image_path_path, "mp3")
-            i_m_list = os.listdir(self.path_cache + image_path_path) if os.listdir(
-                self.path_cache + image_path_path) else []
-            if image_png >= 0 and mp3_count >= 0:
-                result["内置图片"].update(
-                    {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": i_m_list}], "state": 0,
-                     "message": ""})
-            elif image_png == -1 or mp3_count == -1:
-                result["内置图片"].update(
-                    {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": i_m_list}], "state": -1,
-                     "message": "【音频或内置图片不存在】"})
-
-        if package_config_zh_data:  # 首页数据-中文
-            package_config_zh_result = DateCheck().package_config_check(package_config_zh_data)
-            state, message = DateCheck().result_state(package_config_zh_result)
-            result["首页数据（简体中文）"].update(
-                {"data": package_config_zh_result, "state": state, "message": message})
-
-        if file_format == "apk":  # 首页数据-多语言
-            result["首页数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外(首页数据-多语言）文件】"})
-        elif package_config_lang_data:  # 首页数据-多语言
-            package_config_lang_result = DateCheck().package_config_check(package_config_lang_data, is_lang=True)
-            file_count = self.count_files(self.path_cache + self.path_config[file_format]["package_config_path"],
-                                          "json")
-            result["首页数据（国际化语言）"].update(
-                {"file_count": file_count, "random_file": package_config_lang_path.split("/")[-1],
-                 "data": package_config_lang_result})
-            state, message = DateCheck().result_state(package_config_lang_result)
-            result["首页数据（国际化语言）"].update({"state": state, "message": message})
-
-        if package_config_expand_zh_data:  # 趣味拓展-中文
-            package_config_expand_zh_result = DateCheck().expand_config_check(package_config_expand_zh_data)
-            state, message = DateCheck().expand_result_state(package_config_expand_zh_result)
-            result["趣味拓展数据（简体中文）"].update(
-                {"data": package_config_expand_zh_result, "state": state, "message": message})
-
-        if file_format == "apk":  # 趣味拓展-多语言
-            result["趣味拓展数据（国际化语言）"].update({"state": 0, "message": "【apk不判断海外（趣味拓展-多语言）文件】"})
-        elif package_config_expand_lang_data:  # 趣味拓展-多语言
-            file_count = self.count_files(
-                self.path_cache + self.path_config[file_format]["package_config_expand_path"], "json")
-            package_config_expand_lang_result = DateCheck().expand_config_check(package_config_expand_lang_data)
-            state, message = DateCheck().expand_result_state(package_config_expand_lang_result)
-            result["趣味拓展数据（国际化语言）"].update(
-                {"file_count": file_count, "random_file": package_config_expand_lang_path.split("/")[-1],
-                 "data": package_config_expand_lang_result, "state": state, "message": message})
-
-        if default_game_md5_data:
-            result["内置子包"].update({"state": 0, "message": "", "data": default_game_md5_data["item"]})
-        logging.debug("编辑结果")
-        state, message = DateCheck().final_result(result)
-        result["总状态"].update({"state": state, "message": message})
-
-        logging.debug("删除解压文件缓存")
-        shutil.rmtree(self.path_cache)  # 删除解压后的文件
-        logging.debug(json.dumps(result))
-        return result
-# ---默认数据核验------------------------------------------------
-
-
-# ---接口数据核验-----------------------------------------------
-class RequestCheck:
-
-    def task_control(self, platform, version, language, environment, country, url_type):
-        """
-
-        :param url_type:
-        :param platform:
-        :param version:
-        :param language:
-        :param environment:
-        :param country:
-        :return:
-        """
-        return True
-# ---接口数据核验-----------------------------------------------
-
-
-# ----数据正确性校验---------------------------------------------------
-class DateCheck:
-    @staticmethod
-    def package_config_check(data, is_lang=False):
-        """判断默认数据是否正常"""
-        package_config_check_result = []
-        level_result = {"level": "", "count": 0, "error": []}
-        for level in data["areaData"]:
-            level_result_copy = deepcopy(level_result)
-            level_result_copy["level"] = level["style"]["fieldData"]["level"]
-            for lesson in level["data"]:
-                level_result_copy["count"] += 1
-                if is_lang and lesson["dataCode"] != "ConfigData":
-                    if any(t["type"] == "mv" for t in lesson["fieldData"]["stepConfig"]):
-                        level_result_copy["error"].append(
-                            {"areaDataID": lesson["areaDataID"], "id": lesson["id"], "title": lesson["title"],
-                             "packageIdent": lesson["fieldData"]["packageIdent"],
-                             "lang": lesson["fieldData"]["lang"]})
-            package_config_check_result.append(level_result_copy)
-
-        return list(package_config_check_result)
-
-    @staticmethod
-    def result_state(result):
-        message = ""
-        check = 0
-        for l in result:
-            if l["count"] <= 0:
-                check -= 1
-                message += "【level" + l["level"] + "没有课程】"
-
-            if l["error"]:
-                check -= 1
-                message += "【level" + l["level"] + "国际化下存在MV环节】"
-        if len(result) <= 3:
-            check -= 1
-            message += "【只有" + str(len(result)) + "个level，检查数量】"
-        state = -1 if check < 0 else 0
-        return state, message
-
-    @staticmethod
-    def expand_result_state(result):
-        # 趣味拓展不再判断是否有免费课程,只判断课程总数是否大于0
-        message = ""
-        count = result[0]["count"]
-        check = 0
-        for i in result[0]["data"]:
-            if i.get("无总关卡环节"):
-                check -= 1
-                message += "【趣味拓展存在无总关卡环节】"
-                break
-        if count <= 0:
-            message += "【趣味拓展没有配置课程】"
-            check -= 1
-        # else:
-        #     message += "【趣味拓展总课程数量：" + str(count) + "】"
-        state = -1 if check < 0 else 0
-        return state, message
-
-    @staticmethod
-    def final_result(result):
-        state_all = 0
-        message = ""
-        for s in result.keys():
-            if not s == "总状态":
-                state_all = state_all + result[s]["state"]
-                message = message + result[s]["message"]
-        state = -1 if state_all < 0 else 0
-        return state, message
-
-    @staticmethod
-    def expand_config_check(data):
-        count = []
-        hot_num = 0
-        count_int = 0
-        for d in data["areaData"]:
-            count.append({"区域名": d["areaName"], "课程数据": {}})
-            hot_tab = []
-            total_stage_error = {}
-            for i in d["areaTab"]:
-                total_stage_empty = []
-                count[-1]["课程数据"].update({i["areaTabName"]: len(i["data"])})
-                for s in i["data"]:
-                    if s["fieldData"].get("totalStage") in {"0", None}:
-                        total_stage_empty.append(str(s["areaDataID"]) + ":" + s["title"])
-
-                if i["style"]["fieldData"].get("isHot"):
-                    hot_tab.append(i["areaTabName"])
-                    hot_num += 1
-
-                if total_stage_empty:
-                    total_stage_error.update({i["areaTabName"]: total_stage_empty})
-            if hot_tab:
-                count[-1].update({"热门tab": hot_tab})
-            if total_stage_error:
-                count[-1].update({"无总关卡环节": total_stage_error})
-
-        for j in count:
-            for n in j["课程数据"].values():
-                count_int = count_int + n
-
-        package_config_expand_zh_result = [
-            {"level": "趣味拓展", "count": count_int, "热门tab总数": hot_num, "data": count}]
-        return package_config_expand_zh_result
-# ----数据正确性校验---------------------------------------------------
-
-
-# ---adb相关方法-----------------------------------------------
-# 获取devices数量和名称
-def get_devices_all():
-    global devices
-    devices = []  # 每次都重置设备列表
-    for dName_ in os.popen('adb devices -l'):
-        if "List of devices attached" not in dName_:
-            name_list = dName_.split()
-            if "device" in name_list:  # 只加入成功连接的设备
-                devices.append([name_list[0], name_list[3].strip("model:")])
-    return devices
-
-
-# 输入指定字符
-def input_text(device, text):
-    command = 'adb -s ' + device + ' shell input text ' + text
-    os.popen(command).read()
-
-
-# 安装app
-def adb_install(device, adress):
-    install_last = get_packages_list(device)
-    log_info = '设备：' + str(device) + '； ' + '文件：' + adress
-    logging.debug("【正在安装】:" + log_info)
-    install_command = 'adb -s ' + str(device) + ' install ' + '"{}"'.format(str(adress))
-    install_result_str = os.popen(str(install_command))
-    install_result = install_result_str.buffer.read().decode(encoding='utf-8')
-    time.sleep(1)
-    if 'Success' in install_result:
-        install_after = get_packages_list(device)
-        install_appkey = set(install_last) ^ set(install_after)
-        logging.info("【安装成功】:" + log_info)
-        return list(install_appkey), True
-    else:
-        logging.error("【安装失败】: adb命令：" + install_command + "  原因:\n" + install_result)
-
-
-def get_packages_list(device):
-    # 获取当前设备安装的应用
-    packages_list_command = os.popen("adb -s " + device + " shell pm list packages -3").readlines()
-    packages_list = [packages.split(":")[-1].splitlines()[0] for packages in packages_list_command]
-    return packages_list
-
-
-def get_adress(adress):
-    adress_list = []
-    logging.debug("正在处理的目录：" + adress)
-    if os.path.isdir(adress):
-        for f in os.listdir(adress):
-            # 只装apk
-            if ".apk" in f or ".ipa" in f or ".aab" in f or ".json" in f:
-                adress_list.append('{}/{}'.format(adress, f))
-    else:
-        adress_list = [item for item in adress.split("\n") if
-                       ".apk" in item or ".ipa" in item or ".aab" in item or ".json" in item]
-    return adress_list
-
-
-# 卸载手机上所有应用
-def uninstall(device, package_name):
-    uninstall_command = os.popen('adb -s ' + device + " uninstall " + package_name).read()
-    log_info = '包名：' + package_name + '  设备：' + str(device)
-    if 'Success' in uninstall_command[-9:]:
-        logging.info("【删除成功】：" + log_info)
-        return True
-    else:
-        logging.error("【删除失败】" + log_info + "\n原因:\n" + uninstall_command)
-        return False
-
-
-def luncher_app(device, package_name):
-    # 启动应用
-    logging.debug("【正在启动应用】：" + package_name)
-    os.popen("adb -s " + device + " shell am start " + package_name + "/com.sinyee.babybus.SplashAct").read()
-    time.sleep(2)
-
-    # 点击政策，没有也会点 不管成功失败
-    screen_size = os.popen("adb -s " + device + " shell wm size").read()
-    y, x = screen_size.split(":")[-1].strip().split("x")
-    click_y = str(int(int(y) / 2 + 365))
-    click_x = str(int(int(x) / 2))  # 居中的位置
-    os.popen("adb -s " + device + " shell input touchscreen tap " + click_x + " " + click_y).read()  # 同意政策
-    time.sleep(1)
-    click_y_2 = str(int(int(y) / 2 + 350))
-    os.popen("adb -s " + device + " shell input touchscreen tap " + click_x + " " + click_y_2).read()  # 同意隐私弹框
-
-    # 开场动画
-    time.sleep(15)
-
-
-def open_app(device, package_name):
-    # 启动应用
-    logging.debug("【正在启动应用】：" + package_name)
-    os.popen("adb -s " + device + " shell am start " + package_name + "/com.sinyee.babybus.SplashAct").read()
-
-
-def release_debug(device, close=False):
-    if not close:
-        logging.debug("【开启正式线调试指令】：" + device)
-        os.popen("adb -s " + device + " shell setprop debug.babybus.app all").read()
-    else:
-        logging.debug("【关闭正式线调试指令】：" + device)
-        os.popen("adb -s " + device + " shell setprop debug.babybus.app none.").read()
-
-
-def ad_debug(device, close=False):
-    if not close:
-        logging.debug("【开启正式线广告日志指令】：" + device)
-        os.popen("adb -s " + device + " shell setprop debug.babybusadenablelog 1").read()
-    else:
-        logging.debug("【关闭正式线广告日志指令】：" + device)
-        os.popen("adb -s " + device + " shell setprop debug.babybusadenablelog none.").read()
-
-
-def clear_app(device, app_key):
-    logging.debug("【清空应用缓存】：" + device)
-    os.popen("adb -s " + device + " shell pm clear " + app_key).read()
-
-
-def setting_debug(device):
-    logging.debug("【开启语言设置】：" + device)
-    os.popen("adb -s " + device + " shell am start -a android.settings.LOCALE_SETTINGS").read()
-# ---adb相关方法-----------------------------------------------
-
-
-# ---任务列表管理-----------------------------------------------
 def task_clear():
     """
     清空任务列表
@@ -603,6 +70,7 @@ def task_control(path=None, device="", status="未开始", app_id=None, task_id=
     :param app_id: 应用包名
     :param commend: 操作按钮
     :param log: 日志
+    :param file_name: 文件名
     :return:返回任务ID
     """
     global task_list, devices
@@ -629,6 +97,8 @@ def task_control(path=None, device="", status="未开始", app_id=None, task_id=
     task_list_observer.notify()  # 通知任务列表已更新
 
     return task_id
+
+
 # ---任务列表管理-----------------------------------------------
 
 
@@ -996,7 +466,7 @@ class InstallApp:
             self.thread_it(self.clone_task, task)
         elif commend_tpye == "log":
             if task["日志"]:
-                self.show_log(task)
+                show_log(task)
             else:
                 self.massage_label.config(text="日志为空")
         elif commend_tpye == "set_app_key":
@@ -1011,10 +481,8 @@ class InstallApp:
         app_key = new_app_key
         self.app_key_var.set(app_key)
         config_set({"app": {"app_key": app_key}})
-
         if app_key in app_key_histroy:
             app_key_histroy.remove(app_key)
-
         app_key_histroy.insert(0, app_key)
         if len(app_key_histroy) >= 10:
             app_key_histroy = app_key_histroy[:10]
@@ -1022,65 +490,6 @@ class InstallApp:
 
         config_set({"app": {"app_key_histroy": app_key_histroy}})
         self.massage_label.config(text="已设置包名" + app_key)
-
-    @staticmethod
-    def show_log(task):
-        def state_str(state):
-            if state == 0:
-                return "成功"
-            else:
-                return "失败"
-
-        def level_conunt_text(count):
-            for i in count:
-                log_text.insert("end", "阶段-" + i["level"] + "：课程数量 " + str(i["count"]) + "\n")
-                if i["error"]:
-                    log_text.insert("end", "海外存在MV环节的课程：" + str(i["error"]) + "\n")
-                log_text.insert("end", "-" * 20 + "\n", "标题")
-
-        def expand_conunt_text(count):
-            log_text.insert("end", "环节总数:" + str(count[0]["count"]) + "\n")
-            log_text.insert("end", "热门tab总数:" + str(count[0]["热门tab总数"]) + "\n")
-            log_text.insert("end", "-" * 20 + "\n", "标题")
-            for i in count[0]["data"]:
-                for key in i.keys():
-                    log_text.insert("end", key + "：" + str(i[key]) + "\n")
-                log_text.insert("end", "-" * 20 + "\n", "标题")
-
-        log = task["日志"]
-        # 创建一个新的Toplevel窗口
-        log_top = Toplevel()
-        log_top.title("核验默认数据结果")
-
-        # 在窗口中创建一个文本框来显示日志内容
-        log_text = Text(log_top, font="微软雅黑 10 bold")
-        log_text.pack()
-        # 设置文本和样式
-        log_text.tag_configure("标题", foreground="blue")
-        log_text.tag_configure("成功", foreground="green")
-        log_text.tag_configure("失败", foreground="red")
-
-        for title, content in log.items():
-            log_text.insert("end", "========" + title + "========\n", "标题")
-            for t, c in content.items():
-                if t == "data" and c:
-                    if "level" in c[0].keys() and c[0]["level"] == "趣味拓展":
-                        expand_conunt_text(c)
-                    else:
-                        try:
-                            level_conunt_text(c)
-                        except KeyError:
-                            log_text.insert("end", "数据" + "：" + str(c) + "\n")
-                elif t == "state":
-                    log_text.insert("end", "结果" + "：" + state_str(c) + "\n", state_str(c))
-                elif t == "message":
-                    log_text.insert("end", "信息：" + c + "\n")
-                elif t == "file_count":
-                    log_text.insert("end", "文件数量（首页+趣味）" + "：" + str(c) + "\n")
-                elif t == "random_file" and c:
-                    log_text.insert("end", "选取的国际化语言文件" + "：" + str(c) + "\n")
-
-        log_text.configure(state="disabled")
 
     def clone_task(self, task):
         if '安装' in task['状态']:
@@ -1297,16 +706,10 @@ class InstallApp:
         msg = '\n'.join((item.decode("gbk") for item in files))
         self.file_path_text.delete("1.0", "end")
         self.file_path_text.insert("1.0", msg)
-# ---界面UI-----------------------------------------------
-
-
-# ---启动程序-----------------------------------------------
-def gui_start():
-    init_window = Tk()  # 实例化出一个父窗口
-    InstallApp(init_window)
-    init_window.mainloop()
-# ---启动程序-----------------------------------------------
 
 
 if __name__ == '__main__':
-    gui_start()
+    init_window = Tk()  # 实例化出一个父窗口
+    InstallApp(init_window)
+    init_window.mainloop()
+
