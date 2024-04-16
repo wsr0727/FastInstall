@@ -5,11 +5,12 @@ import json
 from copy import deepcopy
 from tkinter import ttk
 import requests
-import DataRequester
+# import DataRequester
 from DefaultCheck import DefaultCheck
 from AdbCommand import *
 from Cache import *
 from FrameUI import *
+
 # 日志设置
 # logging.basicConfig(filename='test.log', level=logging.DEBUG,
 #                     format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
@@ -186,7 +187,7 @@ class InstallApp:
         self.button_frame = Frame(self.install_frame)
         self.button_frame.grid(row=2, column=1, padx=8)
         self.choose_app_frame = LabelFrame(self.button_frame, text="应用管理：")
-        self.choose_app_frame.grid(row=0, column=0, sticky="N", ipady=2, padx=5)
+        self.choose_app_frame.grid(row=0, column=0, sticky="N", ipady=2, padx=5, columnspan=2)
         # 开始按钮
         self.delete_button = Button(self.choose_app_frame, text="卸载应用", width=15,
                                     command=lambda: self.thread_it(self.devices_manager, "delete"))
@@ -198,7 +199,7 @@ class InstallApp:
                                      command=lambda: self.thread_it(self.run))
         self.install_button.grid(row=0, column=2)
 
-        self.choose_devices_frame = LabelFrame(self.button_frame, text="设备管理：")
+        self.choose_devices_frame = LabelFrame(self.button_frame, text="指令管理：")
         self.choose_devices_frame.grid(row=1, column=0, sticky="N")
 
         self.debug_button = Button(self.choose_devices_frame, text="开启调试模式", width=15,
@@ -209,13 +210,22 @@ class InstallApp:
                                    command=lambda: self.thread_it(self.devices_manager, "debug_close"))
         self.debug_button.grid(row=0, column=1, pady=1)
 
-        self.setting_button = Button(self.choose_devices_frame, text="打开语言设置", width=15,
-                                     command=lambda: self.thread_it(self.devices_manager, "setting"))
-        self.setting_button.grid(row=0, column=2, pady=1)
-
         self.setting_button = Button(self.choose_devices_frame, text="打开广告日志", width=14,
                                      command=lambda: self.thread_it(self.devices_manager, "ad_debug"))
-        self.setting_button.grid(row=0, column=3, pady=1)
+        self.setting_button.grid(row=0, column=2, pady=1)
+
+        self.setting_frame = LabelFrame(self.button_frame, text="打开设置页面：")
+        self.setting_frame.grid(row=1, column=1, sticky="N")
+
+        self.setting_lang = Button(self.setting_frame, text="语言", width=5,
+                                   command=lambda: self.thread_it(self.devices_manager, "lang_set"))
+        self.setting_lang.grid(row=0, column=0, pady=1)
+        self.setting_data = Button(self.setting_frame, text="时间", width=5,
+                                   command=lambda: self.thread_it(self.devices_manager, "data_set"))
+        self.setting_data.grid(row=0, column=1, pady=1)
+        self.setting_WiFi = Button(self.setting_frame, text="WiFi", width=5,
+                                   command=lambda: self.thread_it(self.devices_manager, "WiFi_set"))
+        self.setting_WiFi.grid(row=0, column=2, pady=1)
         # 下方区域==============================================================
         self.log_frame = LabelFrame(self.init_window_name, text="任务列表：（默认选中第一个任务）(双击任务可复制文件地址)")
         self.log_frame.grid(row=2, column=0, columnspan=2, padx=10)
@@ -563,9 +573,15 @@ class InstallApp:
 
         global app_key
         for d in select_devices:
-            if name == "setting":
-                self.thread_it(setting_debug, d)
-                task_control(device=d, status="开启语言设置")
+            if name == "lang_set":
+                self.thread_it(setting_debug, d, "语言")
+                task_control(device=d, status="语言设置")
+            elif name == "data_set":
+                self.thread_it(setting_debug, d, "时间")
+                task_control(device=d, status="时间设置")
+            elif name == "WiFi_set":
+                self.thread_it(setting_debug, d, "WiFi")
+                task_control(device=d, status="WiFi设置")
             elif name == "debug":
                 self.thread_it(release_debug, d)
                 task_control(device=d, status="开启调试")
@@ -712,4 +728,3 @@ if __name__ == '__main__':
     init_window = Tk()  # 实例化出一个父窗口
     InstallApp(init_window)
     init_window.mainloop()
-

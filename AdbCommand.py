@@ -126,6 +126,17 @@ def clear_app(device, app_key):
     os.popen("adb -s " + device + " shell pm clear " + app_key).read()
 
 
-def setting_debug(device):
-    logging.debug("【开启语言设置】：" + device)
-    os.popen("adb -s " + device + " shell am start -a android.settings.LOCALE_SETTINGS").read()
+def setting_debug(device, page="语言"):
+    """
+    打开设置页面
+    :param device:
+    :param page: 支持“语言”、“时间”、“WiFi”
+    :return:
+    """
+    logging.debug("【开启" + page + "设置】：" + device)
+    if page == "语言":
+        os.popen("adb -s " + device + " shell am start -a android.settings.LOCALE_SETTINGS").read()
+    elif page == "时间":
+        os.popen("adb -s " + device + " shell am start -a android.settings.DATE_SETTINGS").read()
+    elif page == "WiFi":
+        os.popen("adb -s " + device + " shell am start -a android.settings.WIFI_SETTINGS").read()
