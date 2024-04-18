@@ -218,13 +218,13 @@ class InstallApp:
         self.setting_frame.grid(row=1, column=1, sticky="N")
 
         self.setting_lang = Button(self.setting_frame, text="语言", width=5,
-                                   command=lambda: self.thread_it(self.devices_manager, "lang_set"))
+                                   command=lambda: self.thread_it(self.devices_manager, [setting_debug, "语言"]))
         self.setting_lang.grid(row=0, column=0, pady=1)
         self.setting_data = Button(self.setting_frame, text="时间", width=5,
-                                   command=lambda: self.thread_it(self.devices_manager, "data_set"))
+                                   command=lambda: self.thread_it(self.devices_manager, [setting_debug, "时间"]))
         self.setting_data.grid(row=0, column=1, pady=1)
         self.setting_WiFi = Button(self.setting_frame, text="WiFi", width=5,
-                                   command=lambda: self.thread_it(self.devices_manager, "WiFi_set"))
+                                   command=lambda: self.thread_it(self.devices_manager, [setting_debug, "WiFi"]))
         self.setting_WiFi.grid(row=0, column=2, pady=1)
         # 下方区域==============================================================
         self.log_frame = LabelFrame(self.init_window_name, text="任务列表：（默认选中第一个任务）(双击任务可复制文件地址)")
@@ -524,6 +524,8 @@ class InstallApp:
             check_btn.destroy()
         self.checkboxes = {}
         self.devices = get_devices_all()
+        global devices
+        devices = self.devices
         if len(self.devices) == 0:
             c = Checkbutton(self.devices_frame, text="无设备连接", state='disabled', width=66)
             c.grid(row=1, column=0)
@@ -550,6 +552,11 @@ class InstallApp:
 
     def delete_task(self, device, app_id):
         # 卸载任务管理
+        packages = get_packages_list(device)
+        if app_id not in packages:
+            task_control(app_id=app_key, device=device, status="设备上无包")
+            return
+
         task_id = task_control(app_id=app_id, device=device, status="卸载中")
         result = uninstall(device, app_id)
         item_id = self.get_task(task_id)["item_id"]
@@ -559,6 +566,13 @@ class InstallApp:
         else:
             task_control(task_id=task_id, app_id=app_id, device=device, status="卸载失败")
             self.set_state_tree(item_id, "卸载失败")
+
+    def input_task(self, device, text):
+        # 输入字符串 任务管理
+        if not text:
+            text = self.input_var.get()
+            self.input_histroy_list(text=text)
+        input_text(device, text)
 
     def devices_manager(self, name, text="", task=None):
         # 需要使用到设备的方法，都先判断一遍是否有选中的设备
@@ -571,19 +585,15 @@ class InstallApp:
             open_app(task['设备ID'], task['app_id'])
             return
 
+        if type(name) == list:
+            for d in select_devices:
+                self.thread_it(name[0], d, name[1])
+                task_control(device=d, status=name[1])
+            return
         global app_key
         for d in select_devices:
-            if name == "lang_set":
-                self.thread_it(setting_debug, d, "语言")
-                task_control(device=d, status="语言设置")
-            elif name == "data_set":
-                self.thread_it(setting_debug, d, "时间")
-                task_control(device=d, status="时间设置")
-            elif name == "WiFi_set":
-                self.thread_it(setting_debug, d, "WiFi")
-                task_control(device=d, status="WiFi设置")
-            elif name == "debug":
-                self.thread_it(release_debug, d)
+            if name == "debug":
+                self.thread_it(release_debug, d, False)
                 task_control(device=d, status="开启调试")
             elif name == "debug_close":
                 self.thread_it(release_debug, d, True)
@@ -592,18 +602,9 @@ class InstallApp:
                 self.thread_it(clear_app, d, app_key)
                 task_control(app_id=app_key, device=d, status="清空")
             elif name == "input":
-                if not text:
-                    self.thread_it(input_text, d, self.input_var.get())
-                    self.input_histroy_list(text=self.input_var.get())
-                else:
-                    self.thread_it(input_text, d, text)
-                    # self.input_histroy_list(text=text) # 写入缓存
+                self.thread_it(self.input_task, d, text)
             elif name == "delete":
-                packages = get_packages_list(d)
-                if app_key in packages:
-                    self.thread_it(self.delete_task, d, app_key)
-                else:
-                    task_control(app_id=app_key, device=d, status="设备上无包")
+                self.thread_it(self.delete_task, d, app_key)
             elif name == "open":
                 open_app(d, self.app_key_entry.get())
             elif name == "ad_debug":
@@ -635,10 +636,7 @@ class InstallApp:
             if app_name == "course":
                 result = DefaultCheck(f).course_check()
             else:
-                if file_type == "json":
-                    result = DefaultCheck(f).expand_json_check()
-                else:
-                    result = DefaultCheck(f).main()
+                result = DefaultCheck(f).main()
 
             item_id = self.get_task(task_id)["item_id"]
             if result["总状态"]["state"] == 0:
