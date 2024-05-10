@@ -38,7 +38,7 @@ def adb_install(device, adress):
     if 'Success' in install_result:
         install_after = get_packages_list(device)
         install_appkey = set(install_last) ^ set(install_after)
-        logging.info("【安装成功】:" + log_info)
+        logging.debug("【安装成功】:" + log_info)
         return list(install_appkey), True
     else:
         logging.error("【安装失败】: adb命令：" + install_command + "  原因:\n" + install_result)
@@ -103,8 +103,14 @@ def open_app(device, package_name):
     os.popen("adb -s " + device + " shell am start " + package_name + "/com.sinyee.babybus.SplashAct").read()
 
 
-def release_debug(device, close=False):
-    if not close:
+def release_debug(device, status=True):
+    """
+    开启正式线调试
+    :param device: 设备ID
+    :param status: 是否开启，True 开 ，False 关
+    :return:
+    """
+    if status:
         logging.debug("【开启正式线调试指令】：" + device)
         os.popen("adb -s " + device + " shell setprop debug.babybus.app all").read()
     else:
@@ -112,8 +118,14 @@ def release_debug(device, close=False):
         os.popen("adb -s " + device + " shell setprop debug.babybus.app none.").read()
 
 
-def ad_debug(device, close=False):
-    if not close:
+def ad_debug(device, status=True):
+    """
+    开启正式线广告调试
+    :param device: 设备ID
+    :param status: 是否开启，True 开 ，False 关
+    :return:
+    """
+    if status:
         logging.debug("【开启正式线广告日志指令】：" + device)
         os.popen("adb -s " + device + " shell setprop debug.babybusadenablelog 1").read()
     else:

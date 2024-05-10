@@ -60,4 +60,4 @@ def cache_set():
         return "com.sinyee.babybus.mathIII", [], []
 
 
-app_key, input_list, app_key_histroy = cache_set()  # 初始化缓存
+# app_key, input_list, app_key_histroy = cache_set()  # 初始化缓存

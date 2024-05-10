@@ -2,7 +2,6 @@ from tkinter import *
 import windnd
 import threading
 import json
-from copy import deepcopy
 from tkinter import ttk
 import requests
 # import DataRequester
@@ -10,104 +9,26 @@ from DefaultCheck import DefaultCheck
 from AdbCommand import *
 from Cache import *
 from FrameUI import *
-
+from TaskController import *
+from Glob import *
 # 日志设置
 # logging.basicConfig(filename='test.log', level=logging.DEBUG,
 #                     format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
 # 打包指令 pyinstaller -F -w FastInstall.py
 
-devices = get_devices_all()
-task_list = []  # 任务列表
-
-
-class TaskListObserver:
-    """
-    用于观测任务列表是否有变化，有变化时通知所有位置更新
-    """
-
-    def __init__(self):
-        self._observers = []
-
-    def register(self, observer):
-        self._observers.append(observer)
-
-    def notify(self):
-        for observer in self._observers:
-            observer()
-
-
-task_list_observer = TaskListObserver()
-
-
-def task_clear():
-    """
-    清空任务列表
-    """
-    global task_list
-    task_list.clear()
-    task_list_observer.notify()  # 通知任务列表已更新
-
-
-def get_app_key(path):
-    # 根据文件获取包名
-    file_name = path.split('\\')[-1]
-    if "/" in file_name:
-        file_name = file_name.split('/')[-1]
-    file_name_str = file_name.split('-')
-    for i in file_name_str:
-        if "com." in i:
-            return file_name, i
-
-
-def task_control(path=None, device="", status="未开始", app_id=None, task_id=0, commend=None, log=None, file_name=None):
-    """
-    用于更新任务列表task_list数据。
-    模板{"序号": 0, "状态": status, "设备": device, "设备ID": device, "文件": path, "操作": [],"app_id"：“”，“日志”：None}
-    :param path:文件路径
-    :param device: 设备ID
-    :param status: 完成状态
-    :param task_id: 任务ID
-    :param app_id: 应用包名
-    :param commend: 操作按钮
-    :param log: 日志
-    :param file_name: 文件名
-    :return:返回任务ID
-    """
-    global task_list, devices
-    device_name = [n[1] for n in devices if device in n]
-    if path:  # 地址不为空才判断
-        result = get_app_key(path)
-        if result:
-            file_name = result[0]
-            app_id = result[1]
-    if log:
-        log = deepcopy(log)
-    if task_id == 0:
-        task_id = len(task_list) + 1
-        task_list.insert(0, {"序号": task_id, "状态": status, "设备": device_name, "设备ID": device, "文件": path,
-                             "操作": commend,
-                             "文件名": file_name, "app_id": app_id, "日志": log})
-    else:
-        for i in range(len(task_list)):
-            if task_list[i]["序号"] == task_id:
-                task_list[i] = {"序号": task_id, "状态": status, "设备": device_name, "设备ID": device, "文件": path,
-                                "文件名": file_name, "操作": commend, "app_id": app_id, "日志": log}
-                break
-
-    task_list_observer.notify()  # 通知任务列表已更新
-
-    return task_id
-
-
-# ---任务列表管理-----------------------------------------------
+glob.set_gl_devices(get_devices_all())  # 初始化设备列表
+app_key, input_list, app_key_histroy = cache_set()  # 初始化缓存
+glob.set_gl_input_list(input_list)
+glob.set_gl_app_key(app_key)
+glob.set_gl_app_key_histroy(app_key_histroy)
 
 
 # ---界面UI-----------------------------------------------
 class InstallApp:
     def __init__(self, init_window_name):
         self.init_window_name = init_window_name
-        self.init_window_name.title("安卓测试工具")
+        self.init_window_name.title("超好用的测试工具  3.00.00")
         self.width = 1000
         # self.height = 520
         self.height = 530  # 加上”更多“按钮的高度
@@ -132,8 +53,8 @@ class InstallApp:
         mode_list = ["仅安装", "批量出包安装(自动)", "批量出包安装(手动)"]
         radiobutton_w = int(60 / len(mode_list))
         for m in range(len(mode_list)):
-            Radiobutton(self.mode_frame, text=mode_list[m], variable=self.mode_data, value=mode_list[m], indicatoron=0,
-                        width=radiobutton_w).grid(row=0, column=m, sticky="N")
+            Radiobutton(self.mode_frame, text=mode_list[m], variable=self.mode_data, value=mode_list[m],
+                        indicatoron=False, width=radiobutton_w).grid(row=0, column=m, sticky="N")
         # 包名区域----------------------
         self.app_key_frame = LabelFrame(self.install_frame, text="包名：（支持打开网页）", width=self.width / 2)
         self.app_key_frame.grid(row=1, column=0)
@@ -144,7 +65,8 @@ class InstallApp:
         self.app_key_entry.grid(row=0, column=0)
         self.app_key_entry.bind("<<ComboboxSelected>>", self.app_key_select)
         self.app_key_button = Button(self.app_key_frame, text="打开", width=8,
-                                     command=lambda: self.devices_manager("open"))
+                                     command=lambda: self.devices_manager(
+                                         [open_app, self.app_key_entry.get(), "打开应用"]))
         self.app_key_button.grid(row=0, column=1)
         self.app_key_button = Button(self.app_key_frame, text="设置", width=8,
                                      command=lambda: self.app_key_setting(self.app_key_entry.get()))
@@ -174,14 +96,16 @@ class InstallApp:
         # 设备选择区域-------------------------------------------------------------
         self.devices_frame = LabelFrame(self.install_frame, text="设备选择：（不选默认所有）", width=66)
         self.devices_frame.grid(row=0, column=1, rowspan=2)
+        # 设备刷新按钮
+        self.refresh_button = Button(self.devices_frame, text="刷新", width=8, command=self.devices_checkbutton)
+        self.refresh_button.grid(row=0, column=0, sticky="E")
+        self.devices_checkFrame = Frame(self.devices_frame, width=60)
+        self.devices_checkFrame.grid(row=1, column=0)
         # 设备复选框
         self.checkboxes = {}
         self.devices_button = []
         self.devices = []
         self.devices_checkbutton()
-        # 设备刷新按钮
-        self.refresh_button = Button(self.devices_frame, text="刷新", width=8, command=self.devices_checkbutton)
-        self.refresh_button.grid(row=0, column=0, sticky="E", ipadx=1)
 
         # 按钮区域-------------------------------------------------------------
         self.button_frame = Frame(self.install_frame)
@@ -193,7 +117,9 @@ class InstallApp:
                                     command=lambda: self.thread_it(self.devices_manager, "delete"))
         self.delete_button.grid(row=0, column=0, pady=5)
         self.delete_button = Button(self.choose_app_frame, text="清空应用缓存", width=15,
-                                    command=lambda: self.thread_it(self.devices_manager, "clear"))
+                                    command=lambda: self.thread_it(self.devices_manager,
+                                                                   [clear_app, self.app_key_entry.get(), "清空应用"]))
+
         self.delete_button.grid(row=0, column=1, pady=5)
         self.install_button = Button(self.choose_app_frame, text="安装", width=18,
                                      command=lambda: self.thread_it(self.run))
@@ -203,34 +129,38 @@ class InstallApp:
         self.choose_devices_frame.grid(row=1, column=0, sticky="N")
 
         self.debug_button = Button(self.choose_devices_frame, text="开启调试模式", width=15,
-                                   command=lambda: self.thread_it(self.devices_manager, "debug"))
+                                   command=lambda: self.devices_manager([release_debug, True, "开启调试模式"]))
         self.debug_button.grid(row=0, column=0, pady=1)
 
         self.debug_button = Button(self.choose_devices_frame, text="关闭调试模式", width=15,
-                                   command=lambda: self.thread_it(self.devices_manager, "debug_close"))
+                                   command=lambda: self.devices_manager([release_debug, False, "关闭调试模式"]))
         self.debug_button.grid(row=0, column=1, pady=1)
 
         self.setting_button = Button(self.choose_devices_frame, text="打开广告日志", width=14,
-                                     command=lambda: self.thread_it(self.devices_manager, "ad_debug"))
+                                     command=lambda: self.thread_it(self.devices_manager,
+                                                                    [ad_debug, True, "开启ad日志"]))
         self.setting_button.grid(row=0, column=2, pady=1)
 
         self.setting_frame = LabelFrame(self.button_frame, text="打开设置页面：")
         self.setting_frame.grid(row=1, column=1, sticky="N")
 
         self.setting_lang = Button(self.setting_frame, text="语言", width=5,
-                                   command=lambda: self.thread_it(self.devices_manager, [setting_debug, "语言"]))
+                                   command=lambda: self.thread_it(self.devices_manager,
+                                                                  [setting_debug, "语言", "打开语言页面"]))
         self.setting_lang.grid(row=0, column=0, pady=1)
         self.setting_data = Button(self.setting_frame, text="时间", width=5,
-                                   command=lambda: self.thread_it(self.devices_manager, [setting_debug, "时间"]))
+                                   command=lambda: self.thread_it(self.devices_manager,
+                                                                  [setting_debug, "时间", "打开时间页面"]))
         self.setting_data.grid(row=0, column=1, pady=1)
         self.setting_WiFi = Button(self.setting_frame, text="WiFi", width=5,
-                                   command=lambda: self.thread_it(self.devices_manager, [setting_debug, "WiFi"]))
+                                   command=lambda: self.thread_it(self.devices_manager,
+                                                                  [setting_debug, "WiFi", "打开WiFi页面"]))
         self.setting_WiFi.grid(row=0, column=2, pady=1)
         # 下方区域==============================================================
-        self.log_frame = LabelFrame(self.init_window_name, text="任务列表：（默认选中第一个任务）(双击任务可复制文件地址)")
+        self.log_frame = LabelFrame(self.init_window_name, text="任务列表：(双击任务可复制文件地址)")
         self.log_frame.grid(row=2, column=0, columnspan=2, padx=10)
 
-        self.log_button_frame = LabelFrame(self.log_frame, text="操作：")
+        self.log_button_frame = LabelFrame(self.log_frame, text="操作：(默认选第一个")
         self.log_button_frame.grid(row=0, column=1, sticky="N")
         btn_w = 15  # 操作按钮区域宽度
         btn_h = 1  # 操作按钮区域高度
@@ -306,25 +236,28 @@ class InstallApp:
         self.input_var = StringVar()
         self.input_entry = Entry(self.expand_frame, textvariable=self.input_var, width=40)
         self.input_button = Button(self.expand_frame, text="输入",
-                                   command=lambda: self.thread_it(self.devices_manager, "input"))
+                                   command=lambda: self.thread_it(self.devices_manager,
+                                                                  [self.input_task, "", "输入字符"]))
         # 创建一个Treeview控件
         self.input_histroy = ttk.Treeview(self.expand_frame)
         self.input_histroy.config(height=4)
         self.input_histroy.column("#0", width=350, anchor="w")
-        self.input_histroy.heading("#0", text="输入历史(只保存20条，双击可再次输入)")
-        if input_list:
-            for h in input_list:
+        self.input_histroy.heading("#0", text="输入历史(只保存20条，双击可再次输入，右击可选删除)")
+        if glob.get_gl_input_list():
+            for h in glob.get_gl_input_list():
                 self.input_histroy.insert("", "end", text=h)
         self.input_histroy.bind("<Double-Button-1>", self.click_to_input)
+        # 创建右键菜单
+        self.input_histroy_menu = Menu(self.input_histroy, tearoff=0)
+        self.input_histroy_menu.add_command(label='删除', command=self.delete_selected_item)
+        # 绑定右键事件
+        self.input_histroy.bind('<Button-3>', self.show_context_menu)
+
         self.input_CaptchaNo_test = Button(self.expand_frame, text="测试线输入验证码", width=15,
                                            command=lambda: self.thread_it(self.input_captcha_no, "test"))
         self.input_CaptchaNo = Button(self.expand_frame, text="正式线输入验证码", width=15,
                                       command=lambda: self.thread_it(self.input_captcha_no))
         self.input_CaptchaNo_label = Label(self.expand_frame, text="先选手机号再点")
-
-        # # 拓展-json校验
-        # self.json_check_button = Button(self.init_window_name, text="思维json验证", width=10,
-        #                                 command=lambda: self.thread_it(self.default_check, None, "", "json"))
 
     def file_to_app_key(self):
         file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
@@ -345,7 +278,6 @@ class InstallApp:
         self.expand_off_Label.grid(row=3, column=0, sticky="E", ipadx=10)
 
         self.expand_frame.grid(row=4, column=0, sticky="NW", padx=15)
-        # self.json_check_button.grid(row=4, column=0)
         self.input_Label.grid(row=0, column=0)
         self.input_entry.grid(row=0, column=1)
         self.input_button.grid(row=0, column=2)
@@ -367,26 +299,47 @@ class InstallApp:
         self.input_histroy.grid_remove()
         self.input_CaptchaNo.grid_remove()
 
-    def input_histroy_list(self, text=""):
-        # 处理输入历史的列表
-        global input_list
-        if text in input_list:
-            input_list.remove(text)
+    def input_histroy_list(self, text="", save=True):
+        # 处理输入历史的列表控制，默认保存text,也支持删除text
+        text_list = glob.get_gl_input_list()
+        if text in text_list:
+            text_list.remove(text)
         else:
             self.input_histroy.insert("", 0, text=text)
-        input_list.insert(0, text)
 
-        if len(input_list) >= 20:
-            input_list = input_list[:20]
+        if save:
+            text_list.insert(0, text)
 
-        config_set({"cache": {"input_histroy": input_list}})
+        # 只存20条
+        if len(text_list) >= 20:
+            text_list = text_list[:20]
+
+        glob.set_gl_input_list(text_list)
+        config_set({"cache": {"input_histroy": text_list}})
 
     def click_to_input(self, event):
+        # 输入历史 - 双击再次输入
         item = self.input_histroy.identify('item', event.x, event.y)
         if not item:
             return
         text = self.input_histroy.item(item)['text']
-        self.devices_manager(name="input", text=text)
+        self.devices_manager(name=[self.input_task, text, "输入字符"])
+
+    # 右键删除
+    def show_context_menu(self, event):
+        # 输入历史 - 右击条目展示菜单栏
+        selected_item = self.input_histroy.identify_row(event.y)
+        if not selected_item:
+            return
+        self.input_histroy.selection_set(selected_item)  # 自动选中当前条目
+        self.input_histroy_menu.post(event.x_root, event.y_root)
+
+    def delete_selected_item(self):
+        # 输入历史 - 删除选中的条目
+        cur_item = self.input_histroy.selection()[0]
+        text = self.input_histroy.item(cur_item)['text']
+        self.input_histroy_list(text=text, save=False)
+        self.input_histroy.delete(cur_item)
 
     def input_captcha_no(self, domain_name=""):
         # 输入验证码
@@ -404,7 +357,7 @@ class InstallApp:
         except:
             res = {"ResultCode": -1}
         if res["ResultCode"] == "0":
-            self.devices_manager(name="input", text=res["Data"]['CaptchaNo'])
+            self.devices_manager(name=[self.input_task, res["Data"]['CaptchaNo'], "输入字符"])
             self.input_CaptchaNo_label.config(text="已输入：" + res["Data"]['CaptchaNo'])
         else:
             self.input_CaptchaNo_label.config(text="失败" + text)
@@ -425,7 +378,7 @@ class InstallApp:
         row_data = self.tree.get_children()
         # 取第一行的序号，没有的话就是0
         first_id = self.tree.item(row_data[0])["text"] if row_data else 0
-        for i in task_list:
+        for i in glob.get_gl_task_list():
             # 只更新没有更新过的数据
             if i["序号"] > int(first_id):
                 item_id = self.tree.insert("", 0, text=i["序号"],
@@ -471,7 +424,7 @@ class InstallApp:
             return
         task = self.get_task(cur_item['text'])  # 获取任务详情
         if commend_tpye == "open":
-            self.devices_manager(name="open", task=task)
+            self.thread_it(open_app, task['设备ID'], task['app_id'])
         elif commend_tpye == "clone":
             self.thread_it(self.clone_task, task)
         elif commend_tpye == "log":
@@ -487,19 +440,27 @@ class InstallApp:
         self.app_key_setting(self.app_key_entry.get())
 
     def app_key_setting(self, new_app_key):
-        global app_key, app_key_histroy
-        app_key = new_app_key
-        self.app_key_var.set(app_key)
-        config_set({"app": {"app_key": app_key}})
-        if app_key in app_key_histroy:
-            app_key_histroy.remove(app_key)
-        app_key_histroy.insert(0, app_key)
-        if len(app_key_histroy) >= 10:
-            app_key_histroy = app_key_histroy[:10]
-        self.app_key_entry['values'] = app_key_histroy
+        key_histroy = glob.get_gl_app_key_histroy()
 
-        config_set({"app": {"app_key_histroy": app_key_histroy}})
-        self.massage_label.config(text="已设置包名" + app_key)
+        # 保存新包名
+        self.app_key_var.set(new_app_key)
+        config_set({"app": {"app_key": new_app_key}})
+
+        # 顺序换到首个
+        if new_app_key in key_histroy:
+            key_histroy.remove(new_app_key)
+        key_histroy.insert(0, new_app_key)
+
+        # 只存10条包名历史
+        if len(key_histroy) >= 10:
+            key_histroy = key_histroy[:10]
+        self.app_key_entry['values'] = key_histroy
+
+        config_set({"app": {"app_key_histroy": key_histroy}})
+
+        glob.set_gl_app_key_histroy(key_histroy)
+        glob.set_gl_app_key(new_app_key)
+        self.massage_label.config(text="已设置包名" + new_app_key)
 
     def clone_task(self, task):
         if '安装' in task['状态']:
@@ -524,18 +485,17 @@ class InstallApp:
             check_btn.destroy()
         self.checkboxes = {}
         self.devices = get_devices_all()
-        global devices
-        devices = self.devices
+        glob.set_gl_devices(self.devices)
         if len(self.devices) == 0:
-            c = Checkbutton(self.devices_frame, text="无设备连接", state='disabled', width=66)
+            c = Checkbutton(self.devices_checkFrame, text="无设备连接", state='disabled', width=60)
             c.grid(row=1, column=0)
             self.devices_button.append(c)
         else:
             for i in range(len(self.devices)):
                 self.checkboxes[i] = BooleanVar()
-                c = Checkbutton(self.devices_frame, text=self.devices[i][1], variable=self.checkboxes[i],
-                                width=int(66 / len(self.devices)))
-                c.grid(row=1, column=i)
+                c = Checkbutton(self.devices_checkFrame, text=self.devices[i][1], variable=self.checkboxes[i],
+                                width=int(64 / len(self.devices)))
+                c.grid(row=0, column=i)
                 self.devices_button.append(c)
 
     def devices_checkbutton_get(self):
@@ -574,51 +534,39 @@ class InstallApp:
             self.input_histroy_list(text=text)
         input_text(device, text)
 
-    def devices_manager(self, name, text="", task=None):
+    def open_task(self, device, task=None):
+        # 输入字符串 任务管理
+        if task:
+            app_id = task['app_id']
+            device = task['设备ID']
+        else:
+            app_id = self.app_key_entry.get()
+        open_app(device, app_id)
+
+    def devices_manager(self, name):
         # 需要使用到设备的方法，都先判断一遍是否有选中的设备
         select_devices = self.devices_checkbutton_get()
         if not select_devices:
             self.massage_label.config(text="没有选中设备")
             return
-
-        if name == "open" and task:
-            open_app(task['设备ID'], task['app_id'])
-            return
-
+        # name = [方法名，参数，任务状态] ，现在是list，后面优化成字典
         if type(name) == list:
             for d in select_devices:
                 self.thread_it(name[0], d, name[1])
-                task_control(device=d, status=name[1])
+                task_control(device=d, status=name[2])
             return
-        global app_key
         for d in select_devices:
-            if name == "debug":
-                self.thread_it(release_debug, d, False)
-                task_control(device=d, status="开启调试")
-            elif name == "debug_close":
-                self.thread_it(release_debug, d, True)
-                task_control(device=d, status="关闭调试")
-            elif name == "clear":
-                self.thread_it(clear_app, d, app_key)
-                task_control(app_id=app_key, device=d, status="清空")
-            elif name == "input":
-                self.thread_it(self.input_task, d, text)
-            elif name == "delete":
-                self.thread_it(self.delete_task, d, app_key)
-            elif name == "open":
-                open_app(d, self.app_key_entry.get())
-            elif name == "ad_debug":
-                self.thread_it(ad_debug, d)
-                task_control(device=d, status="开启ad日志")
+            if name == "delete":
+                self.thread_it(self.delete_task, d, glob.get_gl_app_key())
 
     @staticmethod
     def get_task(task_id):
         # 获取任务详情
-        for i in task_list:
+        for i in glob.get_gl_task_list():
             if i["序号"] == task_id:
                 return i
 
-    def default_check(self, task=None, app_name="", file_type=""):
+    def default_check(self, task=None, app_name=""):
         if not task:
             file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
             file_list = get_adress(file_path_data)

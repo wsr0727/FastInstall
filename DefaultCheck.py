@@ -182,6 +182,9 @@ class DefaultCheck:
                 result["内置图片"].update(
                     {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": i_m_list}], "state": -1,
                      "message": "【音频或内置图片不存在】"})
+        elif file_format == "aab":
+            logging.debug("aab没有内置小测，不判断内置图片")
+            result["内置图片"].update({"state": 0, "message": "【谷歌没有内置小测，不判断aab包的内置图片】", "data": []})
 
         if package_config_zh_data:  # 首页数据-中文
             package_config_zh_result = DateCheck().package_config_check(package_config_zh_data)
