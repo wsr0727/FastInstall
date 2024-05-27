@@ -52,16 +52,12 @@ def get_packages_list(device):
 
 
 def get_adress(adress):
-    adress_list = []
     logging.debug("正在处理的目录：" + adress)
+    extensions = ['.apk', '.ipa', '.aab', '.json']  # 只读取这些文件类型的路径
     if os.path.isdir(adress):
-        for f in os.listdir(adress):
-            # 只装apk
-            if ".apk" in f or ".ipa" in f or ".aab" in f or ".json" in f:
-                adress_list.append('{}/{}'.format(adress, f))
+        adress_list = ['{}/{}'.format(adress, f) for f in os.listdir(adress) if any(ext in f for ext in extensions)]
     else:
-        adress_list = [item for item in adress.split("\n") if
-                       ".apk" in item or ".ipa" in item or ".aab" in item or ".json" in item]
+        adress_list = [item for item in adress.split("\n") if any(ext in item for ext in extensions)]
     return adress_list
 
 
@@ -97,10 +93,20 @@ def luncher_app(device, package_name):
     time.sleep(15)
 
 
-def open_app(device, package_name):
+def open_app(device, line):
     # 启动应用
-    logging.debug("【正在启动应用】：" + package_name)
-    os.popen("adb -s " + device + " shell am start " + package_name + "/com.sinyee.babybus.SplashAct").read()
+    if "com.sinyee.babybus" in line:
+        logging.debug("【正在启动宝宝巴士应用】：" + line)
+        line = line + "/com.sinyee.babybus.SplashAct"
+    else:
+        logging.debug("【正在启动链接】：" + line)
+
+    adb_log = os.popen(f"adb -s {device} shell am start -W {line}").read().split("\n")
+
+    info = {key: next((line.split(":")[-1].strip() for line in adb_log if key in line), '') for key in
+            ['LaunchState', 'TotalTime', 'WaitTime']}
+    logging.debug("【启动时长】：" + str(info))
+    return info
 
 
 def release_debug(device, status=True):

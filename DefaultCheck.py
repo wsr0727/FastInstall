@@ -6,6 +6,8 @@ import shutil
 import random
 import json
 from copy import deepcopy
+from DataRequester import args_common, DataRequester, CheckPackageData
+from TaskController import get_file_name_info
 
 """
 默认数据校验，相关方法
@@ -220,9 +222,15 @@ class DefaultCheck:
             result["趣味拓展数据（国际化语言）"].update(
                 {"file_count": file_count, "random_file": package_config_expand_lang_path.split("/")[-1],
                  "data": package_config_expand_lang_result, "state": state, "message": message})
-
         if default_game_md5_data:
-            result["内置子包"].update({"state": 0, "message": "", "data": default_game_md5_data["item"]})
+            status, message, net_game_md5 = 0, "", {}
+            for md5 in default_game_md5_data["item"]:
+                if md5["app_key"] == "math_1andmany":
+                    version = get_file_name_info(self.file_path)["version"]
+                    status, message, net_game_md5 = DateCheck.default_game_md5_check(file_format, md5, version)
+                    break
+            result["内置子包"].update({"state": status, "message": message, "data": [
+                {"内置md5": default_game_md5_data["item"], "服务端md5": net_game_md5}]})
         logging.debug("编辑结果")
         state, message = DateCheck().final_result(result)
         result["总状态"].update({"state": state, "message": message})
@@ -336,3 +344,40 @@ class DateCheck:
         package_config_expand_zh_result = [
             {"level": "趣味拓展", "count": count_int, "热门tab总数": hot_num, "data": count}]
         return package_config_expand_zh_result
+
+    @staticmethod
+    def default_game_md5_check(file_format, default_md5, version):
+        default_md5_x2 = default_md5["md5"]
+        resource_type_code = ["X2"]
+        default_md5_x4 = ""
+        if file_format == "aab":
+            args_ = args_common["思维正式"]["谷歌-英语"]
+        elif file_format == "ipa":
+            args_ = args_common["思维正式"]["苹果-简体"]
+            resource_type_code = ["X2", "X4"]
+            default_md5_x4 = default_md5["md5_x4"]
+        else:
+            # 默认使用安卓国内
+            args_ = args_common["思维正式"]["安卓-简体"]
+
+        data_requester = DataRequester(args_["platform"], version, args_["language"], args_["environment"],
+                                       args_["country"])
+        net_game_md5 = {}
+        for r in resource_type_code:
+            body = data_requester.make_packagedata_body(["math_1andmany"], resource_type_code=r)
+            try:
+                package_data = data_requester.packagedata(body)
+            except:
+                return -1, "【无法获取子包服务端MD5，请检查是否在抓包】", net_game_md5
+            if package_data:
+                net_md5 = CheckPackageData(package_data).is_exist_FileInfo().flatten()
+                net_game_md5.update({r: net_md5[-1]})
+
+        message = "【X2 MD5非线上最新】" if net_game_md5.get("X2") != default_md5_x2 else ""
+        status = -1 if net_game_md5["X2"] != default_md5_x2 else 0
+        if net_game_md5.get("X4") and net_game_md5.get("X4") != default_md5_x4:
+            message += "【X4 MD5非线上最新】"
+            status -= 1
+        status = -1 if status < 0 else 0
+
+        return status, message, net_game_md5

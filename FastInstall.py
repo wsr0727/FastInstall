@@ -1,16 +1,14 @@
 from tkinter import *
 import windnd
 import threading
-import json
 from tkinter import ttk
-import requests
-# import DataRequester
 from DefaultCheck import DefaultCheck
 from AdbCommand import *
 from Cache import *
 from FrameUI import *
 from TaskController import *
 from Glob import *
+from DataRequester import *
 # 日志设置
 # logging.basicConfig(filename='test.log', level=logging.DEBUG,
 #                     format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
@@ -28,7 +26,7 @@ glob.set_gl_app_key_histroy(app_key_histroy)
 class InstallApp:
     def __init__(self, init_window_name):
         self.init_window_name = init_window_name
-        self.init_window_name.title("超好用的测试工具  3.00.00")
+        self.init_window_name.title("超好用的测试工具  3.00.01")
         self.width = 1000
         # self.height = 520
         self.height = 530  # 加上”更多“按钮的高度
@@ -65,8 +63,7 @@ class InstallApp:
         self.app_key_entry.grid(row=0, column=0)
         self.app_key_entry.bind("<<ComboboxSelected>>", self.app_key_select)
         self.app_key_button = Button(self.app_key_frame, text="打开", width=8,
-                                     command=lambda: self.devices_manager(
-                                         [open_app, self.app_key_entry.get(), "打开应用"]))
+                                     command=lambda: self.thread_it(self.devices_manager, "open"))
         self.app_key_button.grid(row=0, column=1)
         self.app_key_button = Button(self.app_key_frame, text="设置", width=8,
                                      command=lambda: self.app_key_setting(self.app_key_entry.get()))
@@ -259,16 +256,48 @@ class InstallApp:
                                       command=lambda: self.thread_it(self.input_captcha_no))
         self.input_CaptchaNo_label = Label(self.expand_frame, text="先选手机号再点")
 
+        # 拓展-子包信息
+        self.packagedata_frame = LabelFrame(self.init_window_name, text="子包最新md5获取：")
+        self.platform_label = Label(self.packagedata_frame, text="平台：")
+        self.platform = ttk.Combobox(self.packagedata_frame, value=list(header_config["platform"].keys()), width=16)
+        self.platform.current(0)
+
+        self.country_label = Label(self.packagedata_frame, text="国家：")
+        self.country = ttk.Combobox(self.packagedata_frame, value=list(header_config["country"].keys()), width=16)
+        self.country.current(0)
+
+        self.language_label = Label(self.packagedata_frame, text="语言：")
+        self.language = ttk.Combobox(self.packagedata_frame, value=list(header_config["language"].keys()), width=16)
+        self.language.current(0)
+
+        self.environment_label = Label(self.packagedata_frame, text="环境：")
+        self.environment = ttk.Combobox(self.packagedata_frame, value=["正式线", "测试线"], width=16)
+        self.environment.current(0)
+
+        self.package_ident = Label(self.packagedata_frame, text="子包标识：")
+        self.ident_var = StringVar()
+        self.ident_entry = Entry(self.packagedata_frame, textvariable=self.ident_var, width=48)
+
+        self.resourceTypeCode_label = Label(self.packagedata_frame, text="资源：")
+        self.resourceTypeCode = ttk.Combobox(self.packagedata_frame, value=["X2", "X4"], width=16)
+        self.resourceTypeCode.current(0)
+
+        self.version_label = Label(self.packagedata_frame, text="版本号：")
+        self.version_var = StringVar()
+        self.version_entry = Entry(self.packagedata_frame, textvariable=self.version_var, width=16)
+
+        self.packagedata_button = Button(self.packagedata_frame, text="获取", width=8, command=self.package_data_request)
+
     def file_to_app_key(self):
         file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
         if not file_path_data:  # 地址不为空才判断
             self.massage_label.config(text="文件地址为空")
             return
-        result = get_app_key(file_path_data)
-        if not result:
+        result = get_file_name_info(file_path_data)
+        if not result.get("app_key"):
             self.massage_label.config(text="识别失败")
             return
-        self.app_key_setting(result[1])
+        self.app_key_setting(result.get("app_key"))
 
     # ========扩展区域
     def expand_show(self, event):
@@ -285,6 +314,23 @@ class InstallApp:
         self.input_CaptchaNo_test.grid(row=2, column=0, columnspan=2, sticky="W")
         self.input_CaptchaNo.grid(row=2, column=1, ipadx=5)
         self.input_CaptchaNo_label.grid(row=2, column=1, columnspan=2, sticky="E", ipadx=2)
+
+        self.packagedata_frame.grid(row=4, column=0, sticky="NE")
+        self.platform_label.grid(row=0, column=0)
+        self.platform.grid(row=0, column=1)
+        self.country_label.grid(row=0, column=2)
+        self.country.grid(row=0, column=3)
+        self.language_label.grid(row=0, column=4)
+        self.language.grid(row=0, column=5)
+        self.environment_label.grid(row=1, column=0, ipady=3)
+        self.environment.grid(row=1, column=1)
+        self.package_ident.grid(row=1, column=2)
+        self.ident_entry.grid(row=1, column=3, columnspan=3)
+        self.resourceTypeCode_label.grid(row=2, column=0)
+        self.resourceTypeCode.grid(row=2, column=1)
+        self.version_label.grid(row=2, column=2)
+        self.version_entry.grid(row=2, column=3)
+        self.packagedata_button.grid(row=2, column=4)
 
     def expand_close(self, event):
         self.height = 530
@@ -424,7 +470,7 @@ class InstallApp:
             return
         task = self.get_task(cur_item['text'])  # 获取任务详情
         if commend_tpye == "open":
-            self.thread_it(open_app, task['设备ID'], task['app_id'])
+            self.thread_it(self.open_task, task['设备ID'], task)
         elif commend_tpye == "clone":
             self.thread_it(self.clone_task, task)
         elif commend_tpye == "log":
@@ -535,13 +581,13 @@ class InstallApp:
         input_text(device, text)
 
     def open_task(self, device, task=None):
-        # 输入字符串 任务管理
+        # 打开流程，包含启动时常日志处理
         if task:
             app_id = task['app_id']
-            device = task['设备ID']
         else:
             app_id = self.app_key_entry.get()
-        open_app(device, app_id)
+        info = open_app(device, app_id)
+        task_control(device=device, app_id=app_id, status="打开应用", log=info)
 
     def devices_manager(self, name):
         # 需要使用到设备的方法，都先判断一遍是否有选中的设备
@@ -550,14 +596,18 @@ class InstallApp:
             self.massage_label.config(text="没有选中设备")
             return
         # name = [方法名，参数，任务状态] ，现在是list，后面优化成字典
-        if type(name) == list:
+        if isinstance(name, list):
+            # 通用流程
             for d in select_devices:
                 self.thread_it(name[0], d, name[1])
                 task_control(device=d, status=name[2])
             return
         for d in select_devices:
+            # 特殊流程
             if name == "delete":
                 self.thread_it(self.delete_task, d, glob.get_gl_app_key())
+            elif name == "open":
+                self.thread_it(self.open_task, d)
 
     @staticmethod
     def get_task(task_id):
@@ -588,10 +638,10 @@ class InstallApp:
 
             item_id = self.get_task(task_id)["item_id"]
             if result["总状态"]["state"] == 0:
-                task_control(task_id=task_id, path=f, device="", status="核验包成功", log=result, commend=["日志"])
+                task_control(task_id=task_id, path=f, device="", status="核验包成功", log=result)
                 self.set_state_tree(item_id, "核验包成功")
             elif result["总状态"]["state"] == -1:
-                task_control(task_id=task_id, path=f, device="", status="核验包失败", log=result, commend=["日志"])
+                task_control(task_id=task_id, path=f, device="", status="核验包失败", log=result)
                 self.set_state_tree(item_id, "核验包失败")
         self.massage_label.config(text="检测默认数据完成")
 
@@ -604,14 +654,13 @@ class InstallApp:
             appkey_list = adb_install(device, path)  # 安装,获取包名
             item_id = self.get_task(task_id)["item_id"]
             if appkey_list:
-                task_control(path=path, device=device, status="安装成功", app_id=appkey_list[0], task_id=task_id,
-                             commend=["打开"])
+                task_control(path=path, device=device, status="安装成功", app_id=appkey_list[0], task_id=task_id)
                 self.set_state_tree(item_id, "安装成功")
                 if is_luncher:
                     appkey = appkey_list[0][0]
                     luncher_app(device, appkey)
             else:
-                task_control(path=path, device=device, status="安装失败", task_id=task_id, commend=[])
+                task_control(path=path, device=device, status="安装失败", task_id=task_id)
                 self.set_state_tree(item_id, "安装失败")
         return appkey
 
@@ -668,6 +717,18 @@ class InstallApp:
         msg = '\n'.join((item.decode("gbk") for item in files))
         self.file_path_text.delete("1.0", "end")
         self.file_path_text.insert("1.0", msg)
+
+    def package_data_request(self):
+        platform = self.platform.get()
+        version = self.version_entry.get()
+        environment = self.environment.get()
+        language = self.language.get()
+        country = self.country.get()
+        resourceTypeCode = self.resourceTypeCode.get()
+        data_requester = DataRequester(platform, version, language, environment, country)
+        body = data_requester.make_packagedata_body([self.ident_entry.get()], resource_type_code=resourceTypeCode)
+        package_data = data_requester.packagedata(body)
+        output_result(CheckPackageData(package_data).is_exist_FileInfo())
 
 
 if __name__ == '__main__':
