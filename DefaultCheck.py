@@ -226,7 +226,7 @@ class DefaultCheck:
             status, message, net_game_md5 = 0, "", {}
             for md5 in default_game_md5_data["item"]:
                 if md5["app_key"] == "math_1andmany":
-                    version = get_file_name_info(self.file_path)["version"]
+                    version = get_file_name_info(self.file_path).get("version")
                     status, message, net_game_md5 = DateCheck.default_game_md5_check(file_format, md5, version)
                     break
             result["内置子包"].update({"state": status, "message": message, "data": [
@@ -360,6 +360,7 @@ class DateCheck:
             # 默认使用安卓国内
             args_ = args_common["思维正式"]["安卓-简体"]
 
+        print(version)
         data_requester = DataRequester(args_["platform"], version, args_["language"], args_["environment"],
                                        args_["country"])
         net_game_md5 = {}
@@ -369,9 +370,13 @@ class DateCheck:
                 package_data = data_requester.packagedata(body)
             except:
                 return -1, "【无法获取子包服务端MD5，请检查是否在抓包】", net_game_md5
-            if package_data:
-                net_md5 = CheckPackageData(package_data).is_exist_FileInfo().flatten()
+
+            net_md5 = CheckPackageData(package_data).is_exist_FileInfo().tolist()
+            if net_md5:
                 net_game_md5.update({r: net_md5[-1]})
+
+        if not net_game_md5:
+            return -1, "【无法获取子包服务端MD5】", net_game_md5
 
         message = "【X2 MD5非线上最新】" if net_game_md5.get("X2") != default_md5_x2 else ""
         status = -1 if net_game_md5["X2"] != default_md5_x2 else 0

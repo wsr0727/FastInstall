@@ -78,13 +78,12 @@ def get_file_name_info(file_name):
     :return: 包名 {"app_key": i}、版本{"version": version}，识别不到返回{}
     """
     file_name_str = file_name.split('-')
-    pattern = r'[0-9]+\.[0-9]+\.*'
+    pattern = r'^[0-9]+\.[0-9]+\.[0-9]+\.?[0-9]+'  # 适配iOS和安卓不同的版本号
     result = {}
     for i in file_name_str:
         match = re.search(pattern, i)
         if match:
-            version = i.replace('.apk', '').replace('.aab', '').replace('.ipa', '').replace('.', '')  # 适配iOS和安卓不同的版本号
-            result.update({"version": version})
+            result.update({"version": match.group().replace('.', '')})
         if "com." in i:
             result.update({"app_key": i})
     return result
@@ -92,5 +91,5 @@ def get_file_name_info(file_name):
 
 if __name__ == '__main__':
     # 代码调试
-    file_name = r"com.sinyee.babybus.mathIII-app-store-2.05.0140-children.ipa"
+    file_name = r"A001-com.sinyee.babybus.mathIII-2.06.0101_debug (1)"
     print(get_file_name_info(file_name))
