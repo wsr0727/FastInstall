@@ -372,8 +372,8 @@ class DateCheck:
                 return -1, "【无法获取子包服务端MD5，请检查是否在抓包】", net_game_md5
 
             net_md5 = CheckPackageData(package_data).is_exist_FileInfo().tolist()
-            if net_md5:
-                net_game_md5.update({r: net_md5[-1]})
+            if net_md5[0]:
+                net_game_md5.update({r: net_md5[0][-1]})
 
         if not net_game_md5:
             return -1, "【无法获取子包服务端MD5】", net_game_md5
