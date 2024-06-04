@@ -27,7 +27,7 @@ glob.set_gl_app_key_histroy(app_key_histroy)
 class InstallApp:
     def __init__(self, init_window_name):
         self.init_window_name = init_window_name
-        self.init_window_name.title("超好用的测试工具  3.00.01")
+        self.init_window_name.title("超好用的测试工具  3.00.02")
         self.width = 1000
         # self.height = 520
         self.height = 530  # 加上”更多“按钮的高度
