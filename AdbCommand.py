@@ -76,7 +76,7 @@ def uninstall(device, package_name):
 def luncher_app(device, package_name):
     # 启动应用
     logging.debug("【正在启动应用】：" + package_name)
-    os.popen("adb -s " + device + " shell am start " + package_name + "/com.sinyee.babybus.SplashAct").read()
+    open_app(device, package_name)
     time.sleep(2)
 
     # 点击政策，没有也会点 不管成功失败
@@ -97,7 +97,7 @@ def open_app(device, line):
     # 启动应用
     if "com.sinyee.babybus" in line:
         logging.debug("【正在启动宝宝巴士应用】：" + line)
-        line = line + "/com.sinyee.babybus.SplashAct"
+        line = line + "/com.babybus.math.plugin.main.activity.SplashAct"
     else:
         logging.debug("【正在启动链接】：" + line)
 
