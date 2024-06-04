@@ -9,6 +9,7 @@ from FrameUI import *
 from TaskController import *
 from Glob import *
 from DataRequester import *
+
 # 日志设置
 # logging.basicConfig(filename='test.log', level=logging.DEBUG,
 #                     format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
@@ -287,6 +288,10 @@ class InstallApp:
         self.version_entry = Entry(self.packagedata_frame, textvariable=self.version_var, width=16)
 
         self.packagedata_button = Button(self.packagedata_frame, text="获取", width=8, command=self.package_data_request)
+        self.alllangpackagedata_button = Button(self.packagedata_frame, text="获取13国语言全部资源", width=18,
+                                                command=self.all_lang_package_data)
+        self.attention_label = Label(self.packagedata_frame, text="注意：【获取13国语言全部资源】无需选择语言和资源，输出给定子包标识x2、x4下13国语言MD5"
+                                                                  "信息")
 
     def file_to_app_key(self):
         file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
@@ -331,6 +336,8 @@ class InstallApp:
         self.version_label.grid(row=2, column=2)
         self.version_entry.grid(row=2, column=3)
         self.packagedata_button.grid(row=2, column=4)
+        self.alllangpackagedata_button.grid(row=2, column=5)
+        self.attention_label.grid(row=3, column=0, columnspan=6)
 
     def expand_close(self, event):
         self.height = 530
@@ -718,17 +725,29 @@ class InstallApp:
         self.file_path_text.delete("1.0", "end")
         self.file_path_text.insert("1.0", msg)
 
+    # 获取给定子包标识的子包信息
     def package_data_request(self):
         platform = self.platform.get()
         version = self.version_entry.get()
         environment = self.environment.get()
         language = self.language.get()
         country = self.country.get()
-        resourceTypeCode = self.resourceTypeCode.get()
+        resource_type_code = self.resourceTypeCode.get()
         data_requester = DataRequester(platform, version, language, environment, country)
-        body = data_requester.make_packagedata_body([self.ident_entry.get()], resource_type_code=resourceTypeCode)
+        body = data_requester.make_packagedata_body([self.ident_entry.get()], resource_type_code=resource_type_code)
         package_data = data_requester.packagedata(body)
-        output_result(CheckPackageData(package_data).is_exist_FileInfo())
+        file_info = CheckPackageData(package_data).is_exist_FileInfo()
+        result_arr = np.insert(file_info, (1, 1), (resource_type_code, language), axis=1)
+        output_result(result_arr)
+
+    # 获取13国语言子包信息
+    def all_lang_package_data(self):
+        platform = self.platform.get()
+        version = self.version_entry.get()
+        environment = self.environment.get()
+        country = self.country.get()
+        result_arr = get_all_lang_packagedatda([self.ident_entry.get()], platform, version, environment, country)
+        output_result(result_arr)
 
 
 if __name__ == '__main__':

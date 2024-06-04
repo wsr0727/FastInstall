@@ -29,16 +29,83 @@ header_config = {
                  "谷歌": {"PlatForm": "60", "PlatForm2": "3", "OSType": "2", "CHCode": "A005", "AppCHCode": "A005"}
                  },
     "country": {"中国大陆": {"Country": "CN"},
-                "美国": {"Country": "US"}
+                "香港": {"Country": "HK"},
+                "澳门": {"Country": "MO"},
+                "台湾": {"Country": "TW"},
+                "美国": {"Country": "US"},
+                "加拿大": {"Country": "CA"},
+                "澳大利亚": {"Country": "AU"},
+                "巴西": {"Country": "BR"},
+                "德国": {"Country": "DE"},
+                "法国": {"Country": "FR"},
+                "英国": {"Country": "GB"},
+                "印度": {"Country": "IN"},
+                "日本": {"Country": "JP"},
+                "韩国": {"Country": "KR"},
+                "墨西哥": {"Country": "MX"},
+                "俄罗斯": {"Country": "RU"},
+                "南非": {"Country": "ZA"},
+                "意大利": {"Country": "IT"},
+                "西班牙": {"Country": "ES"},
+                "沙特阿拉伯": {"Country": "SA"},
+                "阿根廷": {"Country": "AR"},
+                "土耳其": {"Country": "TR"},
+                "瑞士": {"Country": "CH"},
+                "瑞典": {"Country": "SE"},
+                "荷兰": {"Country": "NL"},
+                "新加坡": {"Country": "SG"},
+                "新西兰": {"Country": "NZ"},
+                "挪威": {"Country": "NO"},
+                "比利时": {"Country": "BE"},
+                "芬兰": {"Country": "FI"},
+                "丹麦": {"Country": "DK"},
+                "爱尔兰": {"Country": "IE"},
+                "奥地利": {"Country": "AT"},
+                "伊朗": {"Country": "IR"},
+                "以色列": {"Country": "IL"},
+                "埃及": {"Country": "EG"},
+                "阿联酋": {"Country": "AE"},
+                "马来西亚": {"Country": "MY"},
+                "泰国": {"Country": "TH"},
+                "菲律宾": {"Country": "PH"},
+                "印度尼西亚": {"Country": "ID"},
+                "越南": {"Country": "VN"},
+                "乌克兰": {"Country": "UA"},
+                "波兰": {"Country": "PL"},
+                "匈牙利": {"Country": "HU"},
+                "罗马尼亚": {"Country": "RO"},
+                "捷克": {"Country": "CZ"},
+                "希腊": {"Country": "GR"},
+                "葡萄牙": {"Country": "PT"},
+                "乌拉圭": {"Country": "UY"},
+                "智利": {"Country": "CL"},
+                "埃塞俄比亚": {"Country": "ET"},
+                "肯尼亚": {"Country": "KE"},
+                "尼日利亚": {"Country": "NG"},
+                "摩洛哥": {"Country": "MA"},
+                "哥伦比亚": {"Country": "CO"},
+                "秘鲁": {"Country": "PE"},
+                "委内瑞拉": {"Country": "VE"}
                 },
     "language": {"简体": {"Lang": "zh"},
-                 "英语": {"Lang": "en"}
+                 "英语": {"Lang": "en"},
+                 "繁体": {"Lang": "zht"},
+                 "日语": {"Lang": "ja"},
+                 "韩语": {"Lang": "ko"},
+                 "葡萄牙语": {"Lang": "pt"},
+                 "俄语": {"Lang": "ru"},
+                 "越南语": {"Lang": "vi"},
+                 "泰语": {"Lang": "th"},
+                 "阿拉伯语": {"Lang": "ar"},
+                 "西班牙语": {"Lang": "es"},
+                 "法语": {"Lang": "fr"},
+                 "印度尼西亚语": {"Lang": "id"}
                  },  # TODO 语言参数要换
     "version": {"VerID": "12030104"}
 }
 
 host_config = {"正式线": {"matrixdataapi": "https://matrixdataapi.babybus.com",
-                         "packagedataapi": "https://packagedataapi.babybus.com"}}
+                       "packagedataapi": "https://packagedataapi.babybus.com"}}
 
 path_config = {"首页": "/BabyMind/PageCenter/PageData",
                "子包信息": "/PackageData/GetPackageLangDataList"}
@@ -75,12 +142,12 @@ query_config = {"base": ["AcceptVerID=1", "EncryptType=4", "geVerID=1000000"],
 
 args_common = {
     "思维正式": {"安卓-简体": {"platform": "安卓", "version": "", "language": "简体", "environment": "正式线",
-                            "country": "中国大陆"},
-               "谷歌-英语": {"platform": "谷歌", "version": "", "language": "英语", "environment": "正式线",
-                            "country": "美国"},
-               "苹果-简体": {"platform": "iPhone", "version": "", "language": "简体", "environment": "正式线",
-                            "country": "中国大陆"}
-                 }
+                       "country": "中国大陆"},
+             "谷歌-英语": {"platform": "谷歌", "version": "", "language": "英语", "environment": "正式线",
+                       "country": "美国"},
+             "苹果-简体": {"platform": "iPhone", "version": "", "language": "简体", "environment": "正式线",
+                       "country": "中国大陆"}
+             }
 }
 
 
@@ -285,7 +352,7 @@ class CheckPackageData:
 
             # 打印每一行的数据
             # print(f"{package_ident:<25} {title:<25}{lang_file_info:<35} {package_file_info:<35}")
-            row = [package_ident, title, lang_file_info, package_file_info]
+            row = [package_ident, title, package_file_info, lang_file_info]
             result_arr = np.append(result_arr, [row], axis=0)
 
         return result_arr
@@ -306,6 +373,50 @@ class RequestCheck:
         """
         D = DataRequester(platform, version, language, environment, country)
         return True
+
+
+def get_all_lang_packagedatda(idents, platform, version, environment, country):
+    """
+    获取13国语言下x2、x4资源子包信息
+    :param idents:子包标识列表
+    :param platform:平台
+    :param version:版本号
+    :param environment:环境
+    :param country:国家
+    :return:
+    """
+    result_arr = np.empty((0, 6))
+
+    for lang in header_config["language"]:
+        data_request = DataRequester(platform, version, lang, environment, country)
+        # 获取x2资源
+        resource_type_code = "x2"
+        body_x2 = data_request.make_packagedata_body(idents)
+        fileInfo_x2 = CheckPackageData(data_request.packagedata(body_x2)).is_exist_FileInfo()
+        if fileInfo_x2.size == 0:
+            # 请求结果为空时，填充值
+            first_col = np.array(idents).reshape(-1, 1)
+            fill_cols = np.full((len(idents), 3), "无")
+            fileInfo_x2 = np.hstack((first_col, fill_cols))
+        result_x2 = np.insert(fileInfo_x2, (1, 1), (resource_type_code, lang), axis=1)
+
+        # 获取x4资源
+        resource_type_code = "x4"
+        body_x4 = data_request.make_packagedata_body(idents, resource_type_code="x4")
+        fileInfo_x4 = CheckPackageData(data_request.packagedata(body_x4)).is_exist_FileInfo()
+        if fileInfo_x4.size == 0:
+            first_col = np.array(idents).reshape(-1, 1)
+            fill_cols = np.full((len(idents), 3), "无")
+            fileInfo_x4 = np.hstack((first_col, fill_cols))
+        result_x4 = np.insert(fileInfo_x4, (1, 1), (resource_type_code, lang), axis=1)
+        # 合并数据
+        result = np.vstack((result_x2, result_x4))
+        result_arr = np.vstack((result_arr, result))
+    # 排序
+    indices = np.lexsort((result_arr[:, 1], result_arr[:, 0]))
+    result_arr = result_arr[indices]
+
+    return result_arr
 
 
 if __name__ == "__main__":

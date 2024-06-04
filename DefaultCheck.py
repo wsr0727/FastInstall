@@ -360,7 +360,6 @@ class DateCheck:
             # 默认使用安卓国内
             args_ = args_common["思维正式"]["安卓-简体"]
 
-        print(version)
         data_requester = DataRequester(args_["platform"], version, args_["language"], args_["environment"],
                                        args_["country"])
         net_game_md5 = {}
@@ -373,7 +372,7 @@ class DateCheck:
 
             net_md5 = CheckPackageData(package_data).is_exist_FileInfo().tolist()
             if net_md5[0]:
-                net_game_md5.update({r: net_md5[0][-1]})
+                net_game_md5.update({r: net_md5[0][-2]})
 
         if not net_game_md5:
             return -1, "【无法获取子包服务端MD5】", net_game_md5

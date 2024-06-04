@@ -1,5 +1,5 @@
 from tkinter import *
-from tkinter import ttk, font, messagebox
+from tkinter import  Scrollbar, messagebox
 import tkinter as tk
 
 """
@@ -96,19 +96,53 @@ def show_log(task):
 
 
 def create_table(table_frame, columns, data):
+    """
+    创建表格到frame
+    :param table_frame:表格创建此框架中
+    :param columns:表格列名list
+    :param data:表格内容二维数组
+    """
     # 创建标题
     for col_index, col_name in enumerate(columns):
         header_label = tk.Label(table_frame, text=col_name, **header_style)
         header_label.grid(row=0, column=col_index, sticky="nsew")
 
-    # 创建内容
-    for row_index, row_data in enumerate(data, start=1):
-        for col_index, cell_data in enumerate(row_data):
-            content_btn = Button(table_frame, text=cell_data, foreground="red" if "不存在" in cell_data else "black",
-                                 **content_style)
-            content_btn.grid(row=row_index, column=col_index, sticky="nsew")
-            # 绑定双击事件
-            content_btn.bind("<Double-1>", copy_to_clipboard)
+    # 处理所有列的合并单元格逻辑
+    n_rows = len(data)
+    n_cols = len(columns)
+
+    # processed用于标记哪些单元格已经被处理过
+    processed = [[False] * n_cols for _ in range(n_rows)]
+
+    # 处理每一列
+    for col_index in range(n_cols):
+        row_index = 1
+        while row_index <= n_rows:
+            if row_index > n_rows:
+                break
+            if processed[row_index - 1][col_index]:
+                row_index += 1
+                continue
+
+            # 计算合并单元格范围（当前单元格和起始单元格内容相同则row_index自增）
+            start = row_index
+            while row_index <= n_rows and data[row_index - 1][col_index] == data[start - 1][col_index]:
+                row_index += 1
+            span = row_index - start
+
+            # 合并单元格并填充内容
+            if span > 0:
+                content_btn = Button(table_frame, text=data[start - 1][col_index],
+                                     foreground="red" if "不存在" in data[start - 1][col_index] else "black",
+                                     **content_style)
+                content_btn.grid(row=start, column=col_index, rowspan=span, sticky="nsew")
+
+                # 绑定双击事件
+                content_btn.bind("<Double-1>", copy_to_clipboard)
+
+                # 标记已处理的单元格
+                for row in range(start - 1, row_index - 1):
+                    processed[row][col_index] = True
 
     # 使所有列具有相同的宽度
     for col_index in range(len(columns)):
@@ -133,8 +167,41 @@ def output_result(result_arr):
         # 创建一个新的Toplevel窗口
         log_top = Toplevel()
         log_top.title("子包信息查询结果")
-        table_frame = ttk.Frame(log_top)
-        table_frame.grid(row=0, column=0, sticky='N')
-        create_table(table_frame, ("PackageIdent", "title", "LangFileInfo_MD5", "PackageFileInfo_MD5"), result_arr)
+        log_top.minsize(1000, 50)
+        # 创建主框架
+        main_frame = Frame(log_top)
+        main_frame.pack(fill=BOTH, expand=TRUE)
+        # 创建画布
+        canvas = Canvas(main_frame, bg='white')
+        canvas.pack(side=LEFT, fill=BOTH, expand=TRUE)
+        # 添加滚动条
+        scrollbar = Scrollbar(main_frame, orient=VERTICAL, command=canvas.yview)
+        scrollbar.pack(side=RIGHT, fill=Y)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        # 创建一个frame在其中放置展示内容
+        table_frame = Frame(canvas)
+        # 将table_frame放置在canvas上
+        canvas.create_window((0, 0), window=table_frame, anchor='nw')
+        # 填充内容
+        create_table(table_frame,
+                     ("PackageIdent", "res_type", "lang", "title", "PackageFileInfo_MD5", "LangFileInfo_MD5"),
+                     result_arr)
+        # 更新canvas的滚动区域
+        table_frame.update_idletasks()
+        canvas.config(scrollregion=canvas.bbox("all"))
+
+        # 绑定鼠标滚轮事件
+        def on_mouse_wheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        def bind_mouse_wheel(event):
+            canvas.bind_all("<MouseWheel>", on_mouse_wheel)
+
+        def unbind_mouse_wheel(event):
+            canvas.unbind_all("<MouseWheel>")
+
+        # 鼠标事件绑定：进入窗口区域和离开窗口区域
+        canvas.bind("<Enter>", bind_mouse_wheel)
+        canvas.bind("<Leave>", unbind_mouse_wheel)
     else:
         messagebox.showinfo("查询失败 ", "查询结果为空！")
