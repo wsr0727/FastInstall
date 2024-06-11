@@ -5,6 +5,7 @@ class Glob:
         self.gl_app_key_histroy = []
         self.gl_input_list = []
         self.gl_task_list = []
+        self.gl_ip_history = []
 
     def set_gl_devices(self, value):
         self.gl_devices = value
@@ -35,6 +36,12 @@ class Glob:
 
     def get_gl_task_list(self):
         return self.gl_task_list
+
+    def set_gl_ip_history(self, value):
+        self.gl_ip_history = value
+
+    def get_gl_ip_history(self):
+        return self.gl_ip_history
 
 
 glob = Glob()

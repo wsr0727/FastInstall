@@ -74,6 +74,12 @@ def uninstall(device, package_name):
 
 
 def luncher_app(device, package_name):
+    """"
+    专门用于批量安装应用，流程包含启动-点击隐私政策-点击权限弹框。只点击不判断是否成功
+    :param device: 设备标识
+    :param package_name: 应用key
+    :return:
+    """
     # 启动应用
     logging.debug("【正在启动应用】：" + package_name)
     open_app(device, package_name)
@@ -147,7 +153,7 @@ def clear_app(device, app_key):
 def setting_debug(device, page="语言"):
     """
     打开设置页面
-    :param device:
+    :param device: 设备标识
     :param page: 支持“语言”、“时间”、“WiFi”
     :return:
     """
@@ -158,3 +164,34 @@ def setting_debug(device, page="语言"):
         os.popen("adb -s " + device + " shell am start -a android.settings.DATE_SETTINGS").read()
     elif page == "WiFi":
         os.popen("adb -s " + device + " shell am start -a android.settings.WIFI_SETTINGS").read()
+
+
+def wifi_proxy_setting(device, ip="", port="0", status=True):
+    """
+    设置WiFi代理
+    :param device: 设备标识
+    :param ip: 代理IP
+    :param port: 代理端口
+    :param status: 是否开启，True 开 ，False 关
+    :return: 指令是否执行成功。
+    """
+
+    if status:
+        logging.debug("【开启全局WIFI代理】：" + device + " [ip]" + ip + ":" + port)
+    else:
+        ip, port = "", "0"
+        logging.debug("【关闭全局WIFI代理】：" + device)
+    os.popen("adb -s " + device + " shell settings put global http_proxy " + ip + ":" + port).read()
+
+    return wifi_proxy_check(device)["info"] == ip + ":" + port
+
+
+def wifi_proxy_check(device):
+    """
+    判断当前设备是否有开启全局wifi代理
+    :param device: 设备标识
+    :return: 返回当前代理是否开启（true 开，false 关），info具体信息
+    """
+    info = os.popen("adb -s " + device + " shell settings get global http_proxy").read().strip()
+    logging.debug("【WIFI代理结果】：" + device + " [ip]" + info)
+    return {"state": info not in ["null", ":0"], "info": info}

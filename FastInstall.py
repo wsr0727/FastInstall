@@ -17,17 +17,18 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s-%(levelname)s: [%(f
 # 打包指令 pyinstaller -F -w FastInstall.py
 
 glob.set_gl_devices(get_devices_all())  # 初始化设备列表
-app_key, input_list, app_key_histroy = cache_set()  # 初始化缓存
+app_key, input_list, app_key_histroy, ip_history = get_cache()  # 初始化缓存
 glob.set_gl_input_list(input_list)
 glob.set_gl_app_key(app_key)
 glob.set_gl_app_key_histroy(app_key_histroy)
+glob.set_gl_ip_history(ip_history)
 
 
 # ---界面UI-----------------------------------------------
 class InstallApp:
     def __init__(self, init_window_name):
         self.init_window_name = init_window_name
-        self.init_window_name.title("超好用的测试工具  3.00.02")
+        self.init_window_name.title("超好用的测试工具  3.00.03")
         self.width = 1000
         # self.height = 520
         self.height = 530  # 加上”更多“按钮的高度
@@ -60,7 +61,7 @@ class InstallApp:
         self.app_key_var = StringVar()
         self.app_key_var.set(app_key)
         self.app_key_entry = ttk.Combobox(self.app_key_frame, textvariable=self.app_key_var, width=42,
-                                          values=app_key_histroy)
+                                          values=glob.get_gl_app_key_histroy())
         self.app_key_entry.grid(row=0, column=0)
         self.app_key_entry.bind("<<ComboboxSelected>>", self.app_key_select)
         self.app_key_button = Button(self.app_key_frame, text="打开", width=8,
@@ -94,8 +95,36 @@ class InstallApp:
         # 设备选择区域-------------------------------------------------------------
         self.devices_frame = LabelFrame(self.install_frame, text="设备选择：（不选默认所有）", width=66)
         self.devices_frame.grid(row=0, column=1, rowspan=2)
+
+        # WiFi代理
+        self.wifi_proxy_frame = Frame(self.devices_frame)
+        self.wifi_proxy_frame.grid(row=0, column=0, sticky="W")
+
+        self.ip_label = Label(self.wifi_proxy_frame, text="设置全局代理 IP：")
+        self.ip_label.grid(row=0, column=0, padx=4)
+        self.wifi_ip_var = StringVar()
+        if glob.get_gl_ip_history():
+            self.wifi_ip_var.set(glob.get_gl_ip_history()[0])
+        self.wifi_ip_entry = ttk.Combobox(self.wifi_proxy_frame, textvariable=self.wifi_ip_var, width=13,
+                                          values=glob.get_gl_ip_history())
+        self.wifi_ip_entry.grid(row=0, column=1)
+        self.wifi_port_label = Label(self.wifi_proxy_frame, text=":")
+        self.wifi_port_label.grid(row=0, column=2, padx=1)
+        self.wifi_port_var = StringVar()
+        self.wifi_port_var.set("8888")
+        self.wifi_port_entry = Entry(self.wifi_proxy_frame, textvariable=self.wifi_port_var, width=6)
+        self.wifi_port_entry.grid(row=0, column=3)
+        self.proxy_open_button = Button(self.wifi_proxy_frame, text="开启",
+                                        command=lambda: self.thread_it(self.devices_manager,
+                                                                       [self.wifi_proxy_set, True, "开启WiFi代理"]))
+        self.proxy_open_button.grid(row=0, column=4, padx=1)
+        self.proxy_off_button = Button(self.wifi_proxy_frame, text="关闭",
+                                       command=lambda: self.thread_it(self.devices_manager,
+                                                                      [self.wifi_proxy_set, False, "关闭WiFi代理"]))
+        self.proxy_off_button.grid(row=0, column=5, padx=1)
+
         # 设备刷新按钮
-        self.refresh_button = Button(self.devices_frame, text="刷新", width=8, command=self.devices_checkbutton)
+        self.refresh_button = Button(self.devices_frame, text="刷新设备", width=8, command=self.devices_checkbutton)
         self.refresh_button.grid(row=0, column=0, sticky="E")
         self.devices_checkFrame = Frame(self.devices_frame, width=60)
         self.devices_checkFrame.grid(row=1, column=0)
@@ -103,7 +132,7 @@ class InstallApp:
         self.checkboxes = {}
         self.devices_button = []
         self.devices = []
-        self.devices_checkbutton()
+        self.thread_it(self.devices_checkbutton)
 
         # 按钮区域-------------------------------------------------------------
         self.button_frame = Frame(self.install_frame)
@@ -236,7 +265,7 @@ class InstallApp:
         self.input_button = Button(self.expand_frame, text="输入",
                                    command=lambda: self.thread_it(self.devices_manager,
                                                                   [self.input_task, "", "输入字符"]))
-        # 创建一个Treeview控件
+        # 拓展-输入字符-输入历史
         self.input_histroy = ttk.Treeview(self.expand_frame)
         self.input_histroy.config(height=4)
         self.input_histroy.column("#0", width=350, anchor="w")
@@ -245,12 +274,12 @@ class InstallApp:
             for h in glob.get_gl_input_list():
                 self.input_histroy.insert("", "end", text=h)
         self.input_histroy.bind("<Double-Button-1>", self.click_to_input)
-        # 创建右键菜单
+        # 拓展-输入字符-输入历史-右键菜单
         self.input_histroy_menu = Menu(self.input_histroy, tearoff=0)
         self.input_histroy_menu.add_command(label='删除', command=self.delete_selected_item)
-        # 绑定右键事件
         self.input_histroy.bind('<Button-3>', self.show_context_menu)
 
+        # 拓展-输入字符-按钮
         self.input_CaptchaNo_test = Button(self.expand_frame, text="测试线输入验证码", width=15,
                                            command=lambda: self.thread_it(self.input_captcha_no, "test"))
         self.input_CaptchaNo = Button(self.expand_frame, text="正式线输入验证码", width=15,
@@ -287,7 +316,8 @@ class InstallApp:
         self.version_var = StringVar()
         self.version_entry = Entry(self.packagedata_frame, textvariable=self.version_var, width=16)
 
-        self.packagedata_button = Button(self.packagedata_frame, text="获取", width=8, command=self.package_data_request)
+        self.packagedata_button = Button(self.packagedata_frame, text="获取", width=8,
+                                         command=self.package_data_request)
         self.alllangpackagedata_button = Button(self.packagedata_frame, text="获取13国语言全部资源", width=18,
                                                 command=self.all_lang_package_data)
         self.attention_label = Label(self.packagedata_frame, text="注意：【获取13国语言全部资源】无需选择语言和资源，输出给定子包标识x2、x4下13国语言MD5"
@@ -415,6 +445,20 @@ class InstallApp:
         else:
             self.input_CaptchaNo_label.config(text="失败" + text)
 
+    # ===========WiFi代理的方法
+    def wifi_proxy_set(self, device, status):
+        ip_history_list = glob.get_gl_ip_history()
+        ip = self.wifi_ip_entry.get()
+        port = self.wifi_port_entry.get()
+        if ip in ip_history_list:
+            ip_history.remove(ip)
+        ip_history_list.insert(0, ip)
+        config_set({"cache": {"ip_history": ip_history_list}})
+        glob.set_gl_ip_history(ip_history_list)
+        if wifi_proxy_setting(device, ip, port, status):
+            self.wifi_ip_entry["value"] = ip_history_list
+            self.devices_checkbutton()
+
     # ===========任务列表使用的方法
     def copy_to_clipboard(self, event):
         item = self.tree.identify('item', event.x, event.y)
@@ -532,23 +576,35 @@ class InstallApp:
             self.massage_label.config(text="此任务不支持克隆")
 
     def devices_checkbutton(self):
-        # 构建复选框
-        while self.devices_button:
-            check_btn = self.devices_button.pop()
+        """
+        构建复选框
+        :return:
+        """
+        # 用于保存勾选状态
+        select_devices = [self.devices[i][0] for i in self.checkboxes if self.checkboxes[i].get()]
+
+        # 清除现有的复选按钮
+        for check_btn in self.devices_button:
             check_btn.destroy()
+        self.devices_button.clear()
+
+        # 更新设备和全局设备
         self.checkboxes = {}
         self.devices = get_devices_all()
         glob.set_gl_devices(self.devices)
-        if len(self.devices) == 0:
+
+        if not self.devices:
             c = Checkbutton(self.devices_checkFrame, text="无设备连接", state='disabled', width=60)
             c.grid(row=1, column=0)
             self.devices_button.append(c)
         else:
-            for i in range(len(self.devices)):
-                self.checkboxes[i] = BooleanVar()
-                c = Checkbutton(self.devices_checkFrame, text=self.devices[i][1], variable=self.checkboxes[i],
-                                width=int(64 / len(self.devices)))
-                c.grid(row=0, column=i)
+            width = int(60 / len(self.devices))
+            for i, device in enumerate(self.devices):
+                wifi_proxy = "【已代理】" if wifi_proxy_check(device[0])["state"] else ""
+                self.checkboxes[i] = BooleanVar(value=device[0] in select_devices)
+                c = Checkbutton(self.devices_checkFrame, text=device[1] + wifi_proxy, variable=self.checkboxes[i],
+                                width=width)
+                c.grid(row=1, column=i)
                 self.devices_button.append(c)
 
     def devices_checkbutton_get(self):
@@ -560,8 +616,28 @@ class InstallApp:
                 select_devices.append(self.devices[i][0])
             devices_all.append(self.devices[i][0])
         if not select_devices:
-            select_devices = devices_all
+            return devices_all
         return select_devices
+
+    def devices_manager(self, name):
+        # 需要使用到设备的方法，都先判断一遍是否有选中的设备
+        select_devices = self.devices_checkbutton_get()
+        if not select_devices:
+            self.massage_label.config(text="没有选中设备")
+            return
+        # name = [方法名，参数，任务状态] ，现在是list，后面优化成字典
+        if isinstance(name, list):
+            # 通用流程
+            for d in select_devices:
+                self.thread_it(name[0], d, name[1])
+                task_control(device=d, status=name[2])
+            return
+        for d in select_devices:
+            # 特殊流程
+            if name == "delete":
+                self.thread_it(self.delete_task, d, glob.get_gl_app_key())
+            elif name == "open":
+                self.thread_it(self.open_task, d)
 
     def delete_task(self, device, app_id):
         # 卸载任务管理
@@ -595,26 +671,6 @@ class InstallApp:
             app_id = self.app_key_entry.get()
         info = open_app(device, app_id)
         task_control(device=device, app_id=app_id, status="打开应用", log=info)
-
-    def devices_manager(self, name):
-        # 需要使用到设备的方法，都先判断一遍是否有选中的设备
-        select_devices = self.devices_checkbutton_get()
-        if not select_devices:
-            self.massage_label.config(text="没有选中设备")
-            return
-        # name = [方法名，参数，任务状态] ，现在是list，后面优化成字典
-        if isinstance(name, list):
-            # 通用流程
-            for d in select_devices:
-                self.thread_it(name[0], d, name[1])
-                task_control(device=d, status=name[2])
-            return
-        for d in select_devices:
-            # 特殊流程
-            if name == "delete":
-                self.thread_it(self.delete_task, d, glob.get_gl_app_key())
-            elif name == "open":
-                self.thread_it(self.open_task, d)
 
     @staticmethod
     def get_task(task_id):
