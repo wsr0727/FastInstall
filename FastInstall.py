@@ -447,17 +447,26 @@ class InstallApp:
 
     # ===========WiFi代理的方法
     def wifi_proxy_set(self, device, status):
-        ip_history_list = glob.get_gl_ip_history()
-        ip = self.wifi_ip_entry.get()
-        port = self.wifi_port_entry.get()
-        if ip in ip_history_list:
-            ip_history.remove(ip)
-        ip_history_list.insert(0, ip)
-        config_set({"cache": {"ip_history": ip_history_list}})
-        glob.set_gl_ip_history(ip_history_list)
-        if wifi_proxy_setting(device, ip, port, status):
+        """
+        设置全局WiFi代理
+        :param device: 设备
+        :param status: 开启还是关闭
+        :return: None
+        """
+        ip, port = (self.wifi_ip_entry.get(), self.wifi_port_entry.get()) if status else ("", "0")
+
+        if status:
+            ip_history_list = glob.get_gl_ip_history()
+            ip, port = self.wifi_ip_entry.get(), self.wifi_port_entry.get()
+            if ip in ip_history_list:
+                ip_history.remove(ip)
+            ip_history_list.insert(0, ip)
+            config_set({"cache": {"ip_history": ip_history_list}})
+            glob.set_gl_ip_history(ip_history_list)
             self.wifi_ip_entry["value"] = ip_history_list
-            self.devices_checkbutton()
+
+        if wifi_proxy_setting(device, ip, port, status):
+            self.devices_checkbutton()  # 刷新设备复选框
 
     # ===========任务列表使用的方法
     def copy_to_clipboard(self, event):
