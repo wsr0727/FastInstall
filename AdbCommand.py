@@ -99,15 +99,22 @@ def luncher_app(device, package_name):
     time.sleep(15)
 
 
-def open_app(device, line):
+def open_app(device, app_name):
     # 启动应用
-    if "com.sinyee.babybus" in line:
-        logging.debug("【正在启动宝宝巴士应用】：" + line)
-        line = line + "/com.babybus.math.plugin.main.activity.SplashAct"
-    else:
-        logging.debug("【正在启动链接】：" + line)
+    def lunch_(lunch_device, activity):
+        return os.popen(f"adb -s {lunch_device} shell am start -W {activity}").read().split("\n")
 
-    adb_log = os.popen(f"adb -s {device} shell am start -W {line}").read().split("\n")
+    if "com.sinyee.babybus" in app_name:
+        logging.debug("【正在启动宝宝巴士应用】：" + app_name)
+        line = app_name + "/com.babybus.math.plugin.main.activity.SplashAct"
+    else:
+        line = app_name
+        logging.debug("【正在启动链接】：" + app_name)
+
+    adb_log = lunch_(device, line)
+    if 'Error type 3' in adb_log:
+        # 兼容新旧两种activity
+        adb_log = lunch_(device, app_name + "/com.sinyee.babybus.SplashAct")
 
     info = {key: next((line.split(":")[-1].strip() for line in adb_log if key in line), '') for key in
             ['LaunchState', 'TotalTime', 'WaitTime']}
