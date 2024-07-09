@@ -255,6 +255,7 @@ class DateCheck:
             for lesson in level["data"]:
                 level_counter += 1
                 if is_lang and lesson["dataCode"] not in ["ConfigData", "SubPackageData"]:
+                    # 国际化默认数据 且 数据类型非配置类型、非分包类型 才会判断是否配置了MV环节
                     if any(t["type"] == "mv" for t in lesson["fieldData"]["stepConfig"]):
                         error_list.append({
                             "areaDataID": lesson["areaDataID"],
