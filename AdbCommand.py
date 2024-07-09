@@ -106,7 +106,7 @@ def open_app(device, app_name):
 
     if "com.sinyee.babybus" in app_name:
         logging.debug("【正在启动宝宝巴士应用】：" + app_name)
-        line = app_name + "/com.babybus.math.plugin.main.activity.SplashAct"
+        line = app_name + "/com.sinyee.babybus.SplashAct"
     else:
         line = app_name
         logging.debug("【正在启动链接】：" + app_name)
@@ -114,7 +114,7 @@ def open_app(device, app_name):
     adb_log = lunch_(device, line)
     if 'Error type 3' in adb_log:
         # 兼容新旧两种activity
-        adb_log = lunch_(device, app_name + "/com.sinyee.babybus.SplashAct")
+        adb_log = lunch_(device, app_name + "/com.babybus.math.plugin.main.activity.SplashAct")
 
     info = {key: next((line.split(":")[-1].strip() for line in adb_log if key in line), '') for key in
             ['LaunchState', 'TotalTime', 'WaitTime']}
