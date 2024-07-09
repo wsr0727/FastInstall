@@ -246,21 +246,31 @@ class DateCheck:
     def package_config_check(data, is_lang=False):
         """判断默认数据是否正常"""
         package_config_check_result = []
-        level_result = {"level": "", "count": 0, "error": []}
-        for level in data["areaData"]:
-            level_result_copy = deepcopy(level_result)
-            level_result_copy["level"] = level["style"]["fieldData"]["level"]
-            for lesson in level["data"]:
-                level_result_copy["count"] += 1
-                if is_lang and lesson["dataCode"] != "ConfigData":
-                    if any(t["type"] == "mv" for t in lesson["fieldData"]["stepConfig"]):
-                        level_result_copy["error"].append(
-                            {"areaDataID": lesson["areaDataID"], "id": lesson["id"], "title": lesson["title"],
-                             "packageIdent": lesson["fieldData"]["packageIdent"],
-                             "lang": lesson["fieldData"]["lang"]})
-            package_config_check_result.append(level_result_copy)
 
-        return list(package_config_check_result)
+        for level in data["areaData"]:
+            level_counter = 0
+            error_list = []
+            level_name = level["style"]["fieldData"]["level"]
+
+            for lesson in level["data"]:
+                level_counter += 1
+                if is_lang and lesson["dataCode"] not in ["ConfigData", "SubPackageData"]:
+                    if any(t["type"] == "mv" for t in lesson["fieldData"]["stepConfig"]):
+                        error_list.append({
+                            "areaDataID": lesson["areaDataID"],
+                            "id": lesson["id"],
+                            "title": lesson["title"],
+                            "packageIdent": lesson["fieldData"]["packageIdent"],
+                            "lang": lesson["fieldData"]["lang"]
+                        })
+
+            package_config_check_result.append({
+                "level": level_name,
+                "count": level_counter,
+                "error": error_list
+            })
+
+        return package_config_check_result
 
     @staticmethod
     def result_state(result):
