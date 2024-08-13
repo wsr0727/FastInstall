@@ -329,15 +329,35 @@ class CheckPackageData:
     def __init__(self, package_data):
         self.package_data = package_data
 
-    def is_exist_FileInfo(self):
+    def is_exist_FileInfo(self, return_array=True):
         """
-        :return result_arr: 子包信息校验结果（一个二维数组）
+        判断子包文件和语言包文件是否存在
+        :param return_array: 是否返回数组类型，True-返回数组类型，False-返回字典类型
+        :return:
+            result_arr: 子包信息校验结果（一个n行4列数组）
+                数组包含字段：[package_ident, title, package_file_info, lang_file_info]
+                            package_ident：子包标识
+                            title：标题
+                            package_file_info：子包文件Md5，子包文件不存在时填充“子包文件不存在”
+                            lang_file_info：语言包文件Md5，语言包文件不存在时填充“语言包文件不存在”
+            result_dict: 子包信息校验结果（字典类型）,key是子包标识，value包含参数title、package_file_info和lang_file_info
+                字典格式示例：
+                {
+                    "math_1andmany": {
+                                        "title": "One and Many",
+                                        "package_file_info": "6bd009f375458ef00d13c2589791470a",
+                                        "lang_file_info": "c508affb38e960f746415d85ce39687b"
+                                    }
+                }
+
         """
         package_data = self.package_data
         # 获取 packageDataList 数组
         package_data_list = package_data.get('data', {}).get('packageDataList', [])
 
         result_arr = np.empty((0, 4))
+
+        result_dict = {}
 
         # 遍历 packageDataList
         for package in package_data_list:
@@ -350,12 +370,18 @@ class CheckPackageData:
                                                                                                              {}).get(
                 'packageFileInfo') else '子包文件不存在'
 
-            # 打印每一行的数据
-            # print(f"{package_ident:<25} {title:<25}{lang_file_info:<35} {package_file_info:<35}")
             row = [package_ident, title, package_file_info, lang_file_info]
             result_arr = np.append(result_arr, [row], axis=0)
 
-        return result_arr
+            result_dict[package_ident] = {
+                'title': title,
+                'package_file_info': package_file_info,
+                'lang_file_info': lang_file_info
+            }
+        if return_array:
+            return result_arr
+        else:
+            return result_dict
 
 
 class RequestCheck:

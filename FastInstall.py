@@ -9,6 +9,7 @@ from FrameUI import *
 from TaskController import *
 from Glob import *
 from DataRequester import *
+from LanguageChecker import show_lang_window
 
 # 日志设置
 # logging.basicConfig(filename='test.log', level=logging.DEBUG,
@@ -28,12 +29,22 @@ glob.set_gl_ip_history(ip_history)
 class InstallApp:
     def __init__(self, init_window_name):
         self.init_window_name = init_window_name
-        self.init_window_name.title("超好用的测试工具  3.00.05")
+        self.init_window_name.title("超好用的测试工具  3.00.06")
         self.width = 1000
         # self.height = 520
         self.height = 530  # 加上”更多“按钮的高度
         self.init_window_name.geometry(str(self.width) + 'x' + str(self.height) + '+15+30')
         windnd.hook_dropfiles(self.init_window_name, func=self.dragg)
+
+        # 创建菜单栏
+        self.menubar = tk.Menu(self.init_window_name)
+
+        # 创建文件菜单
+        self.tools_menu = tk.Menu(self.menubar, tearoff=0)
+        self.tools_menu.add_command(label="国际化音频校验", command=show_lang_window)
+        self.tools_menu.add_separator()
+        self.menubar.add_cascade(label="工具箱", menu=self.tools_menu)
+        self.init_window_name.config(menu=self.menubar)
 
         # 顶部区域==============================================================
         self.top_frame = Frame(self.init_window_name)

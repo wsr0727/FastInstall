@@ -251,7 +251,7 @@ class DateCheck:
             level_counter = 0
             error_list = []
             level_name = level["style"]["fieldData"]["level"]
-
+            level_name = "测验卷-"+level_name if level["moduleCode"] == "ExamArea" else level_name
             for lesson in level["data"]:
                 level_counter += 1
                 if is_lang and lesson["dataCode"] not in ["ConfigData", "SubPackageData"]:
@@ -381,9 +381,10 @@ class DateCheck:
             except:
                 return -1, "【无法获取子包服务端MD5，请检查是否在抓包】", net_game_md5
 
-            net_md5 = CheckPackageData(package_data).is_exist_FileInfo().tolist()
-            if net_md5[0]:
-                net_game_md5.update({r: net_md5[0][-2]})
+            package_data_dict = CheckPackageData(package_data).is_exist_FileInfo(return_array=False)
+            if "math_1andmany" in package_data_dict.keys():
+                net_md5 = package_data_dict["math_1andmany"]["package_file_info"]
+                net_game_md5.update({r: net_md5})
 
         if not net_game_md5:
             return -1, "【无法获取子包服务端MD5】", net_game_md5
