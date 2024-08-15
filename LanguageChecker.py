@@ -114,7 +114,7 @@ def thread_it(func, *args):
 class LanguageChecker:
     def __init__(self, lang_window_name):
         self.lang_window_name = lang_window_name
-        self.lang_window_name.title("国际化音频校验")
+        self.lang_window_name.title("国际化音频校验  1.00.00")
         self.width = 490
         self.height = 590
         self.lang_window_name.geometry(str(self.width) + 'x' + str(self.height))
