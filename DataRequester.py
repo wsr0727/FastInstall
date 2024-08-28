@@ -108,6 +108,7 @@ host_config = {"正式线": {"matrixdataapi": "https://matrixdataapi.babybus.com
                        "packagedataapi": "https://packagedataapi.babybus.com"}}
 
 path_config = {"首页": "/BabyMind/PageCenter/PageData",
+               "非首页": "/PageCenter/PageData",
                "子包信息": "/PackageData/GetPackageLangDataList"}
 
 body_config = {"子包信息": {"加减": {
@@ -138,7 +139,14 @@ body_config = {"子包信息": {"加减": {
 }}}
 
 query_config = {"base": ["AcceptVerID=1", "EncryptType=4", "geVerID=1000000"],
-                "首页": ["routeCode=Index", "resourceTypeCode=X2"]}
+                "首页": ["resourceTypeCode=X2", "routeCode=Index"],
+                "脑力开发": ["resourceTypeCode=X2", "routeCode=Expand"],
+                "入园准备": ["resourceTypeCode=X2", "routeCode=School"],
+                "巩固练习": ["resourceTypeCode=X2", "routeCode=Train2"],
+                "加减专项": ["resourceTypeCode=X2", "routeCode=Arithmetic2"],
+                "思维视频": ["resourceTypeCode=X2", "routeCode=Video"],
+                "亲子互动": ["resourceTypeCode=X2", "routeCode=Interaction"]
+                }
 
 args_common = {
     "思维正式": {"安卓-简体": {"platform": "安卓", "version": "", "language": "简体", "environment": "正式线",
@@ -233,15 +241,18 @@ class DataRequester:
         return header
 
     @staticmethod
-    def query_complete(query, headers="", body=""):
+    def query_complete(query="", headers="", body=""):
         """
         组装数据
-        :param query: 基础URL
+        :param query: 查询参数
         :param headers: 加密后的请求头
         :param body: 请求body
         :return: 完整URL
         """
-        query = query + "&HeaderMD5=" + md5_encrypt(headers).upper() + "&ProductID=4034" + "&SignatureStamp=" + str(
+        if query:
+            query = "&" + query
+        query = "&".join(query_config["base"]) + "&HeaderMD5=" + md5_encrypt(
+            headers).upper() + "&ProductID=4034" + query + "&SignatureStamp=" + str(
             int(time.time()))
         if body:  # 有的接口没有body
             query = query + "&ContentMD5=" + md5_encrypt(body).upper()
@@ -257,13 +268,35 @@ class DataRequester:
         """
         header_encrypt = aes_encrypt(str(json.dumps(self.header_complete())))  # 请求头组装，并加密
 
-        query_encrypt = self.query_complete("&".join(query_config["base"]), header_encrypt)
+        query_encrypt = self.query_complete("&".join(query_config["首页"]), header_encrypt)
 
         url = host_config[self.environment]["matrixdataapi"] + path_config[
             "首页"] + "?" + query_encrypt
-        # TODO 首页加上查询参数  query_config["首页"] 就会报错，签名失败。之后要请求其他页面了再优化
+
         logging.debug("URL:" + url + " header:" + str(header_encrypt))
-        response = requests.request("GET", url, headers={'ClientHeaderInfo': header_encrypt})
+        response = requests.request("GET", url, headers={'ClientHeaderInfo': header_encrypt, 'Accept-Language': str(
+            header_config["language"][self.language]["Lang"]) + "-" + header_config["country"][self.country][
+                                                                                                                    "Country"] + ";q=1"})
+        logging.debug("response:" + str(response.text))
+        return response.json()
+
+    def page_data(self, route):
+        """
+        脑力开发、加减专项、思维视频、巩固练习、亲子互动页面数据
+        :param route: 获取的位置
+        :return: 页面数据
+        """
+        header_encrypt = aes_encrypt(str(json.dumps(self.header_complete())))  # 请求头组装，并加密
+
+        query_encrypt = self.query_complete("&".join(query_config[route]), header_encrypt)
+
+        url = host_config[self.environment]["matrixdataapi"] + path_config[
+            "非首页"] + "?" + query_encrypt
+
+        logging.debug("URL:" + url + " header:" + str(header_encrypt))
+        response = requests.request("GET", url, headers={'ClientHeaderInfo': header_encrypt, 'Accept-Language': str(
+            header_config["language"][self.language]["Lang"]) + "-" + header_config["country"][self.country][
+                                                                                                                    "Country"] + ";q=1"})
         logging.debug("response:" + str(response.text))
         return response.json()
 
@@ -303,7 +336,7 @@ class DataRequester:
         """
         header_encrypt = aes_encrypt(str(json.dumps(self.header_complete())))  # 请求头组装，并加密
 
-        query_encrypt = self.query_complete("&".join(query_config["base"]), header_encrypt)
+        query_encrypt = self.query_complete(headers=header_encrypt)
 
         content_encrypt = aes_encrypt(str(json.dumps(body)))
 
@@ -452,6 +485,7 @@ if __name__ == "__main__":
                                    args_["country"])
     body = data_requester.make_packagedata_body(["math_1andmany"], resource_type_code="X2")
     package_data = data_requester.packagedata(body)
+    # package_data = data_requester.page_data("脑力开发")
     print(package_data)
 # idents = get_PackageIdent_By_Pagedata(DataRequester("安卓", "2050101", "简体", "正式线", "中国大陆").page_data_main())
 # body = make_packagedata_body(idents)
