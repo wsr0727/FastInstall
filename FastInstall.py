@@ -5,7 +5,7 @@ from tkinter import ttk
 from DefaultCheck import DefaultCheck
 from AdbCommand import *
 from Cache import *
-from FrameUI import *
+from FrameUI import show_log, output_result
 from TaskController import *
 from Glob import *
 from DataRequester import *
@@ -17,7 +17,6 @@ from LanguageChecker import show_lang_window
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
 # 打包指令 pyinstaller -F -w FastInstall.py
 
-glob.set_gl_devices(get_devices_all())  # 初始化设备列表
 app_key, input_list, app_key_histroy, ip_history = get_cache()  # 初始化缓存
 glob.set_gl_input_list(input_list)
 glob.set_gl_app_key(app_key)
@@ -37,10 +36,10 @@ class InstallApp:
         windnd.hook_dropfiles(self.init_window_name, func=self.dragg)
 
         # 创建菜单栏
-        self.menubar = tk.Menu(self.init_window_name)
+        self.menubar = Menu(self.init_window_name)
 
         # 创建文件菜单
-        self.tools_menu = tk.Menu(self.menubar, tearoff=0)
+        self.tools_menu = Menu(self.menubar, tearoff=0)
         self.tools_menu.add_command(label="国际化音频校验", command=show_lang_window)
         self.tools_menu.add_separator()
         self.menubar.add_cascade(label="工具箱", menu=self.tools_menu)
