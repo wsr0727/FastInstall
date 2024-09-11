@@ -8,6 +8,7 @@ import hashlib
 import time
 import requests
 import numpy as np
+import os
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
 """
@@ -197,6 +198,27 @@ def md5_encrypt(text):
     m = hashlib.md5()
     m.update(text.encode('utf-8'))
     return m.hexdigest()
+
+
+def download_file(url, save_path):
+    """
+    下载文件
+    :param url:下载地址
+    :param save_path:保存的位置
+    :return save_path:下载成功，返回保存的位置
+    """
+    # 创建文件目录（如果不存在）
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    response = requests.get(url, stream=True)
+    if response.status_code == 200:
+        with open(save_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        logging.debug(f"文件已成功下载到： {save_path}")
+        return save_path
+    else:
+        logging.debug(f"下载失败，状态码: {response.status_code}")
 
 
 def get_PackageIdent_By_Pagedata(pagedata):
