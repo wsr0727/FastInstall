@@ -125,10 +125,18 @@ def thread_it(func, *args):
 
 class ExcelProcess:
     @staticmethod
-    def read_excel_1st_col_as_dict(excel_file_path):
+    def return_engine_by_endswith(file_path):
+        if file_path.endswith('.xlsx'):
+            return 'openpyxl'
+        elif file_path.endswith('.xls'):
+            return 'xlrd'
+        else:
+            raise ValueError("文件类型不支持，只支持 .xlsx 和 .xls 格式")
+
+    def read_excel_1st_col_as_dict(self, excel_file_path):
         """读取xlsx 或 csv 文件的第一列数据并返回字典。{语音：[第一列音频名称]}"""
         # 读取Excel文件
-        xls = pd.ExcelFile(excel_file_path, engine='openpyxl')
+        xls = pd.ExcelFile(excel_file_path, engine=self.return_engine_by_endswith(excel_file_path))
 
         # 获取所有工作表的名称
         sheet_names = xls.sheet_names
@@ -136,8 +144,8 @@ class ExcelProcess:
 
         for sheet_name in sheet_names:
             # 工作表的数据
-            name = next((l for l in language.values() if l in sheet_name), sheet_name)
-            df = pd.read_excel(xls, sheet_name=sheet_name, engine='openpyxl')
+            name = next((lang for lang in language.values() if lang in sheet_name), sheet_name)
+            df = pd.read_excel(xls, sheet_name=sheet_name, engine=self.return_engine_by_endswith(excel_file_path))
             # 获取第一列的数据并转换为列表
             audio_list = df.iloc[0:, 0].tolist()  # 将第一列数据转换为列表
             # 过滤掉nan值
@@ -145,15 +153,9 @@ class ExcelProcess:
 
         return feedback_audios
 
-    @staticmethod
-    def read_excel_1st_col_as_list(file_path):
+    def read_excel_1st_col_as_list(self, file_path):
         """读取xlsx 或 csv 文件的第一列数据并返回列表"""
-        if file_path.endswith('.xlsx'):
-            df = pd.read_excel(file_path, engine='openpyxl')
-        elif file_path.endswith('.csv'):
-            df = pd.read_csv(file_path)
-        else:
-            raise ValueError("文件类型不支持，只支持 .xlsx 和 .csv 格式")
+        df = pd.read_excel(file_path, engine=self.return_engine_by_endswith(file_path))
 
         # 获取第一列的数据并转换为列表
         first_column_list = df.iloc[2:, 0].tolist()  # 将第一列数据转换为列表
@@ -205,31 +207,31 @@ class LanguageChecker:
         self.lang_massage_label2.configure(state="disabled")
 
         # 表格数据处理
-        self.excel_file_path_frame = LabelFrame(self.lang_window_name, text="【表格数据处理】")
+        self.excel_file_path_frame = LabelFrame(self.lang_window_name, text="【共享音频与反馈表格对比】")
         self.excel_file_path_frame.grid(row=0, column=1)
 
-        self.excel_file_path_label = Label(self.excel_file_path_frame, text="外包反馈表格（将文件拖入文本框）：")
+        self.excel_file_path_label = Label(self.excel_file_path_frame, text="外包反馈表格（将文件拖入文本框，仅支持xls、xlsx）：")
         self.excel_file_path_label.grid(row=0, column=0, sticky="w")
         self.excel_file_path_text = Text(self.excel_file_path_frame, width=50, height=4)
         self.excel_file_path_text.grid(row=1, column=0, columnspan=2)
         # 设置拖动获取文件的区域
         windnd.hook_dropfiles(self.excel_file_path_text,
                               func=lambda files: self.dragg(files, self.excel_file_path_text))
-        self.excel_lang_check_button = Button(self.excel_file_path_frame, text="共享音频与反馈表格对比",
+        self.excel_lang_check_button = Button(self.excel_file_path_frame, text="比对",
                                               command=lambda: thread_it(self.start_latest_files_feedback_excel_check))
         self.excel_lang_check_button.grid(row=0, column=1)
 
-        self.excel_file_path_frame2 = LabelFrame(self.lang_window_name, text="【全语言表格处理】")
+        self.excel_file_path_frame2 = LabelFrame(self.lang_window_name, text="【游戏音频与差异表格对比】")
         self.excel_file_path_frame2.grid(row=1, column=1)
 
-        self.excel_file_path_label2 = Label(self.excel_file_path_frame2, text="全语言差异表（将文件拖入文本框）：")
+        self.excel_file_path_label2 = Label(self.excel_file_path_frame2, text="全语言差异表（将文件拖入文本框，仅支持xls、xlsx）：")
         self.excel_file_path_label2.grid(row=0, column=0, sticky="w")
         self.excel_file_path_text2 = Text(self.excel_file_path_frame2, width=50, height=4)
         self.excel_file_path_text2.grid(row=1, column=0, columnspan=2)
         windnd.hook_dropfiles(self.excel_file_path_text2,
                               func=lambda files: self.dragg(files, self.excel_file_path_text2))
 
-        self.batch_check_button = Button(self.excel_file_path_frame2, text="游戏音频与差异表格对比",
+        self.batch_check_button = Button(self.excel_file_path_frame2, text="比对",
                                          command=lambda: thread_it(self.start_lang_file_integrity_check))
         self.batch_check_button.grid(row=0, column=1)
 
@@ -245,23 +247,26 @@ class LanguageChecker:
         self.log_frame.grid(row=3, column=0)
         self.log_text = Text(self.log_frame, width=66, height=22)
         self.log_text.grid(row=0, column=0)
-        self.log_text.tag_configure("标题", foreground="blue")
-        self.log_text.tag_configure("成功", foreground="green")
-        self.log_text.tag_configure("失败", foreground="red")
+        self.style_configure(self.log_text)
 
         # 表格比对日志
         self.excel_log_frame = LabelFrame(self.lang_window_name, text="表格比对日志")
         self.excel_log_frame.grid(row=3, column=1)
         self.excel_log_text = Text(self.excel_log_frame, width=50, height=22)
         self.excel_log_text.grid(row=0, column=0)
-        self.excel_log_text.tag_configure("标题", foreground="blue")
-        self.excel_log_text.tag_configure("成功", foreground="green")
-        self.excel_log_text.tag_configure("失败", foreground="red")
+        self.style_configure(self.excel_log_text)
 
         # 共享文件中每个语言对应的文件夹，根据语言保存成字典
         self.shared_file_by_lang = {}
         # 共享文件中有修改的音频名称，根据语言保存成字典
         self.shared_audio_by_lang = {}
+
+    @staticmethod
+    def style_configure(log_widget):
+        """在文本框末尾插入text_content"""
+        log_widget.tag_configure("标题", foreground="blue")
+        log_widget.tag_configure("成功", foreground="green")
+        log_widget.tag_configure("失败", foreground="red")
 
     @staticmethod
     def insert_text(log_widget, text_content, tag=None):
@@ -338,8 +343,6 @@ class LanguageChecker:
                             self.insert_text(self.log_text, flag + f"文件 '{file}' 在两个文件夹中是相同的。", "成功")
                     else:
                         self.insert_text(self.log_text, flag + f"【失败】文件 '{file}' 在两个文件夹中是不同的。", "失败")
-                # else:
-                #     print(f"文件 '{file}' 在文件夹 {folder2} 中不存在。")
 
     def start_batch_latest_files(self):
         """【获取修改文件】批量找出文件夹内最近更新的文件"""
@@ -349,7 +352,7 @@ class LanguageChecker:
         self.delete_text(self.lang_massage_label)
         folder1 = self.get_text(self.file_path_text)
         if not folder1:
-            self.insert_text(self.log_text, "请输入需要检查的音频路径。","失败")
+            self.insert_text(self.log_text, "请输入需要检查的音频路径。", "失败")
             return False
 
         subfolders = get_all_subfolders(folder1)  # 获取所有子文件夹
@@ -368,7 +371,7 @@ class LanguageChecker:
         """【批量比对音频】在获取修改文件的基础上，解压游戏语音包，与共享文件上的音频比对MD5"""
         self.delete_text(self.log_text)
         self.delete_text(self.lang_massage_label2)
-        folder2_list = self.get_text(self.file_path_text2)
+        folder2_list = self.get_text(self.file_path_text2).split('\n')
 
         if not self.shared_file_by_lang or not folder2_list:
             self.insert_text(self.log_text,
@@ -400,7 +403,7 @@ class LanguageChecker:
             shutil.rmtree(path_cache)
 
     def start_latest_files_feedback_excel_check(self):
-        """【共享音频与反馈表格对比】二轮全语言完整性检查，批量比对游戏音频与差异表音频列表是否一致"""
+        """【共享音频与反馈表格对比】先获取共享音频中有修改的音频文件，再与反馈表对比"""
         self.delete_text(self.excel_log_text)
         if not self.shared_audio_by_lang:
             if not self.start_batch_latest_files():
@@ -410,7 +413,7 @@ class LanguageChecker:
         if not feedback_excel:
             self.insert_text(self.excel_log_text, "请输入外包反馈表格地址", "失败")
             return
-        audio_dict = ExcelProcess.read_excel_1st_col_as_dict(feedback_excel)
+        audio_dict = ExcelProcess().read_excel_1st_col_as_dict(feedback_excel)
         # 去除“.mp3”后缀
         shared_audio_by_lang = {lang: [filename.replace('.mp3', '') for filename in filenames] for lang, filenames in
                                 self.shared_audio_by_lang.items()}
@@ -425,6 +428,8 @@ class LanguageChecker:
                 for audio in audio_dict[key]:
                     if audio not in set(shared_audio_by_lang[key]):
                         self.insert_text(self.excel_log_text, f"    共享文件中音频：{audio} 未更新", "失败")
+            else:
+                self.insert_text(self.excel_log_text, f"    无异常，音频列表：\n    {audio_dict[key]}", "成功")
 
         self.insert_text(self.excel_log_text, "====【共享音频与反馈表格对比】完成====", "标题")
 
@@ -433,9 +438,8 @@ class LanguageChecker:
         self.delete_text(self.excel_log_text)
 
         excel_path = self.get_text(self.excel_file_path_text2)  # 差异表，即正确音频目录
-        result_list = ExcelProcess.read_excel_1st_col_as_list(excel_path)
-        game_lang_path = self.get_text(self.file_path_text2)
-        # 检查文件夹中的文件
+        result_list = ExcelProcess().read_excel_1st_col_as_list(excel_path)
+        game_lang_path = self.get_text(self.file_path_text2)  # 音频路径
         self.insert_text(self.excel_log_text, "开始检测【游戏音频与差异表音频列表是否一致】", "标题")
         for lang in language.keys():
             self.insert_text(self.excel_log_text, f"=====检测语言【{language[lang]}】=======", "标题")
