@@ -5,7 +5,6 @@ import zipfile
 import shutil
 import random
 import json
-from copy import deepcopy
 from DataRequester import args_common, DataRequester, CheckPackageData
 from TaskController import get_file_name_info
 
