@@ -210,7 +210,8 @@ class LanguageChecker:
         self.excel_file_path_frame = LabelFrame(self.lang_window_name, text="【共享音频与反馈表格对比】")
         self.excel_file_path_frame.grid(row=0, column=1)
 
-        self.excel_file_path_label = Label(self.excel_file_path_frame, text="外包反馈表格（将文件拖入文本框，仅支持xls、xlsx）：")
+        self.excel_file_path_label = Label(self.excel_file_path_frame,
+                                           text="外包反馈表格（将文件拖入文本框，仅支持xls、xlsx）：")
         self.excel_file_path_label.grid(row=0, column=0, sticky="w")
         self.excel_file_path_text = Text(self.excel_file_path_frame, width=50, height=4)
         self.excel_file_path_text.grid(row=1, column=0, columnspan=2)
@@ -224,7 +225,8 @@ class LanguageChecker:
         self.excel_file_path_frame2 = LabelFrame(self.lang_window_name, text="【游戏音频与差异表格对比】")
         self.excel_file_path_frame2.grid(row=1, column=1)
 
-        self.excel_file_path_label2 = Label(self.excel_file_path_frame2, text="全语言差异表（将文件拖入文本框，仅支持xls、xlsx）：")
+        self.excel_file_path_label2 = Label(self.excel_file_path_frame2,
+                                            text="全语言差异表（将文件拖入文本框，仅支持xls、xlsx）：")
         self.excel_file_path_label2.grid(row=0, column=0, sticky="w")
         self.excel_file_path_text2 = Text(self.excel_file_path_frame2, width=50, height=4)
         self.excel_file_path_text2.grid(row=1, column=0, columnspan=2)
@@ -439,20 +441,34 @@ class LanguageChecker:
 
         excel_path = self.get_text(self.excel_file_path_text2)  # 差异表，即正确音频目录
         result_list = ExcelProcess().read_excel_1st_col_as_list(excel_path)
+
         game_lang_path = self.get_text(self.file_path_text2)  # 音频路径
+        self.insert_text(self.excel_log_text, "解压中....", "标题")
+        package_cache = zip_to_file(game_lang_path)
+
+        if game_lang_path.endswith(".apk"):
+            game_lang_path = package_cache + "/assets/res/subModules"
+        elif game_lang_path.endswith(".ipa"):
+            game_lang_path = package_cache + "/Payload/2d_noSuper_education.app/res/subModules"
+
         self.insert_text(self.excel_log_text, "开始检测【游戏音频与差异表音频列表是否一致】", "标题")
         for lang in language.keys():
             self.insert_text(self.excel_log_text, f"=====检测语言【{language[lang]}】=======", "标题")
             # 拼接子包内的音频路径
-            lang_path = game_lang_path + f"/res/i18n/{lang}/snd/effect"
-            lang_file_path = os.listdir(lang_path)
+            lang_file_list = []  # 所有内置子包的语音列表
+            for package in os.listdir(game_lang_path):
+                lang_path = os.path.join(game_lang_path, package, "res", "i18n", lang, "snd", "effect")
+                if os.path.exists(lang_path):
+                    lang_file_list = lang_file_list + os.listdir(lang_path)
+
             for file_name in result_list:
                 # 获取该文件名在指定文件夹下是否存在
-                file_exists = any(os.path.splitext(f)[0] == file_name for f in lang_file_path)
+                file_exists = any(os.path.splitext(f)[0] == file_name for f in lang_file_list)
                 if not file_exists:
                     # 如果不存在才输出
                     self.insert_text(self.excel_log_text, f"    游戏音频缺少文件文件 '{file_name}'。", "失败")
         self.insert_text(self.excel_log_text, "检测完成【游戏音频与差异表音频列表是否一致】", "标题")
+        shutil.rmtree(package_cache)
 
     def start_check(self):
         """【单语言对比】"""
