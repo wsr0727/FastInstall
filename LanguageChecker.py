@@ -8,7 +8,7 @@ import zipfile
 import time
 from pathlib import Path
 import threading
-import pandas as pd
+import xlrd
 
 # 打包指令（仅打包国际化音频校验工具） pyinstaller -F -w LanguageChecker.py
 language = {"zh": "简体", "en": "英语", "zht": "繁体", "ja": "日语", "ko": "韩语", "pt": "葡语", "ru": "俄语",
@@ -124,44 +124,46 @@ def thread_it(func, *args):
 
 
 class ExcelProcess:
-    @staticmethod
-    def return_engine_by_endswith(file_path):
-        if file_path.endswith('.xlsx'):
-            return 'openpyxl'
-        elif file_path.endswith('.xls'):
-            return 'xlrd'
-        else:
-            raise ValueError("文件类型不支持，只支持 .xlsx 和 .xls 格式")
 
-    def read_excel_1st_col_as_dict(self, excel_file_path):
-        """读取xlsx 或 csv 文件的第一列数据并返回字典。{语音：[第一列音频名称]}"""
+    @staticmethod
+    def read_excel_1st_col_as_dict(excel_file_path):
+        """读取 xlsx 或 xls 文件的第一列数据并返回字典。{语音：[第一列音频名称]}"""
         # 读取Excel文件
-        xls = pd.ExcelFile(excel_file_path, engine=self.return_engine_by_endswith(excel_file_path))
+        workbook = xlrd.open_workbook(excel_file_path)
 
         # 获取所有工作表的名称
-        sheet_names = xls.sheet_names
+        sheet_names = workbook.sheet_names()
         feedback_audios = {}
 
         for sheet_name in sheet_names:
             # 工作表的数据
             name = next((lang for lang in language.values() if lang in sheet_name), sheet_name)
-            df = pd.read_excel(xls, sheet_name=sheet_name, engine=self.return_engine_by_endswith(excel_file_path))
-            # 获取第一列的数据并转换为列表
-            audio_list = df.iloc[0:, 0].tolist()  # 将第一列数据转换为列表
-            # 过滤掉nan值
-            feedback_audios.update({name: [value for value in audio_list if not pd.isna(value)]})
+            sheet = workbook.sheet_by_name(sheet_name)
 
+            # 获取第一列的数据并转换为列表
+            audio_list = []
+            for row_index in range(1, sheet.nrows):  # 遍历行
+                cell_value = sheet.cell_value(row_index, 0)  # 获取第一列的值
+                if cell_value:  # 过滤掉空值
+                    audio_list.append(cell_value)
+
+            feedback_audios[name] = audio_list
+        print(feedback_audios)
         return feedback_audios
 
-    def read_excel_1st_col_as_list(self, file_path):
-        """读取xlsx 或 csv 文件的第一列数据并返回列表"""
-        df = pd.read_excel(file_path, engine=self.return_engine_by_endswith(file_path))
+    @staticmethod
+    def read_excel_1st_col_as_list(file_path):
+        """读取 xlsx 或 xls 文件的第一列数据并返回列表"""
+        workbook = xlrd.open_workbook(file_path)
+        sheet = workbook.sheet_by_index(0)  # 读取第一个工作表
 
         # 获取第一列的数据并转换为列表
-        first_column_list = df.iloc[2:, 0].tolist()  # 将第一列数据转换为列表
-        # 过滤掉nan值
-        first_column_list = [value for value in first_column_list if not pd.isna(value)]
-
+        first_column_list = []
+        for row_index in range(3, sheet.nrows):  # 从第三行开始
+            cell_value = sheet.cell_value(row_index, 0)  # 获取第一列的值
+            if cell_value:  # 过滤掉空值
+                first_column_list.append(cell_value)
+        print(first_column_list)
         return first_column_list
 
 
@@ -460,7 +462,6 @@ class LanguageChecker:
                 lang_path = os.path.join(game_lang_path, package, "res", "i18n", lang, "snd", "effect")
                 if os.path.exists(lang_path):
                     lang_file_list = lang_file_list + os.listdir(lang_path)
-
             for file_name in result_list:
                 # 获取该文件名在指定文件夹下是否存在
                 file_exists = any(os.path.splitext(f)[0] == file_name for f in lang_file_list)
