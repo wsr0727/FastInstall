@@ -124,6 +124,7 @@ def thread_it(func, *args):
 
 
 class ExcelProcess:
+    """表格相关方法"""
 
     @staticmethod
     def read_excel_1st_col_as_dict(excel_file_path):
