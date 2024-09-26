@@ -5,11 +5,12 @@ from tkinter import ttk
 from DefaultCheck import DefaultCheck
 from AdbCommand import *
 from Cache import *
-from FrameUI import show_log, output_result
+from FrameUI import show_log
 from TaskController import *
 from Glob import *
 from DataRequester import *
 from LanguageChecker import show_lang_window
+from PackageDataChecker import show_data_check_window
 
 # 日志设置
 # logging.basicConfig(filename='test.log', level=logging.DEBUG,
@@ -41,6 +42,8 @@ class InstallApp:
         # 创建文件菜单
         self.tools_menu = Menu(self.menubar, tearoff=0)
         self.tools_menu.add_command(label="国际化音频校验", command=show_lang_window)
+        self.tools_menu.add_separator()
+        self.tools_menu.add_command(label="数据核验工具", command=show_data_check_window)
         self.tools_menu.add_separator()
         self.menubar.add_cascade(label="工具箱", menu=self.tools_menu)
         self.init_window_name.config(menu=self.menubar)
@@ -296,42 +299,6 @@ class InstallApp:
                                       command=lambda: self.thread_it(self.input_captcha_no))
         self.input_CaptchaNo_label = Label(self.expand_frame, text="先选手机号再点")
 
-        # 拓展-子包信息
-        self.packagedata_frame = LabelFrame(self.init_window_name, text="子包最新md5获取：")
-        self.platform_label = Label(self.packagedata_frame, text="平台：")
-        self.platform = ttk.Combobox(self.packagedata_frame, value=list(header_config["platform"].keys()), width=16)
-        self.platform.current(0)
-
-        self.country_label = Label(self.packagedata_frame, text="国家：")
-        self.country = ttk.Combobox(self.packagedata_frame, value=list(header_config["country"].keys()), width=16)
-        self.country.current(0)
-
-        self.language_label = Label(self.packagedata_frame, text="语言：")
-        self.language = ttk.Combobox(self.packagedata_frame, value=list(header_config["language"].keys()), width=16)
-        self.language.current(0)
-
-        self.environment_label = Label(self.packagedata_frame, text="环境：")
-        self.environment = ttk.Combobox(self.packagedata_frame, value=["正式线", "测试线"], width=16)
-        self.environment.current(0)
-
-        self.package_ident = Label(self.packagedata_frame, text="子包标识：")
-        self.ident_var = StringVar()
-        self.ident_entry = Entry(self.packagedata_frame, textvariable=self.ident_var, width=48)
-
-        self.resourceTypeCode_label = Label(self.packagedata_frame, text="资源：")
-        self.resourceTypeCode = ttk.Combobox(self.packagedata_frame, value=["X2", "X4"], width=16)
-        self.resourceTypeCode.current(0)
-
-        self.version_label = Label(self.packagedata_frame, text="版本号：")
-        self.version_var = StringVar()
-        self.version_entry = Entry(self.packagedata_frame, textvariable=self.version_var, width=16)
-
-        self.packagedata_button = Button(self.packagedata_frame, text="获取", width=8,
-                                         command=self.package_data_request)
-        self.alllangpackagedata_button = Button(self.packagedata_frame, text="获取13国语言全部资源", width=18,
-                                                command=self.all_lang_package_data)
-        self.attention_label = Label(self.packagedata_frame, text="注意：【获取13国语言全部资源】无需选择语言和资源，输出给定子包标识x2、x4下13国语言MD5"
-                                                                  "信息")
 
     def file_to_app_key(self):
         file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
@@ -359,25 +326,6 @@ class InstallApp:
         self.input_CaptchaNo_test.grid(row=2, column=0, columnspan=2, sticky="W")
         self.input_CaptchaNo.grid(row=2, column=1, ipadx=5)
         self.input_CaptchaNo_label.grid(row=2, column=1, columnspan=2, sticky="E", ipadx=2)
-
-        self.packagedata_frame.grid(row=4, column=0, sticky="NE")
-        self.platform_label.grid(row=0, column=0)
-        self.platform.grid(row=0, column=1)
-        self.country_label.grid(row=0, column=2)
-        self.country.grid(row=0, column=3)
-        self.language_label.grid(row=0, column=4)
-        self.language.grid(row=0, column=5)
-        self.environment_label.grid(row=1, column=0, ipady=3)
-        self.environment.grid(row=1, column=1)
-        self.package_ident.grid(row=1, column=2)
-        self.ident_entry.grid(row=1, column=3, columnspan=3)
-        self.resourceTypeCode_label.grid(row=2, column=0)
-        self.resourceTypeCode.grid(row=2, column=1)
-        self.version_label.grid(row=2, column=2)
-        self.version_entry.grid(row=2, column=3)
-        self.packagedata_button.grid(row=2, column=4)
-        self.alllangpackagedata_button.grid(row=2, column=5)
-        self.attention_label.grid(row=3, column=0, columnspan=6)
 
     def expand_close(self, event):
         self.height = 530
@@ -799,31 +747,6 @@ class InstallApp:
         msg = '\n'.join((item.decode("gbk") for item in files))
         self.file_path_text.delete("1.0", "end")
         self.file_path_text.insert("1.0", msg)
-
-    # 获取给定子包标识的子包信息
-    def package_data_request(self):
-        platform = self.platform.get()
-        version = self.version_entry.get()
-        environment = self.environment.get()
-        language = self.language.get()
-        country = self.country.get()
-        resource_type_code = self.resourceTypeCode.get()
-        data_requester = DataRequester(platform, version, language, environment, country)
-        body = data_requester.make_packagedata_body([self.ident_entry.get()], resource_type_code=resource_type_code)
-        package_data = data_requester.packagedata(body)
-        file_info = CheckPackageData(package_data).is_exist_FileInfo()
-        result_arr = np.insert(file_info, (1, 1), (resource_type_code, language), axis=1)
-        output_result(result_arr)
-
-    # 获取13国语言子包信息
-    def all_lang_package_data(self):
-        platform = self.platform.get()
-        version = self.version_entry.get()
-        environment = self.environment.get()
-        country = self.country.get()
-        result_arr = get_all_lang_packagedatda([self.ident_entry.get()], platform, version, environment, country)
-        output_result(result_arr)
-
 
 if __name__ == '__main__':
     init_window = Tk()  # 实例化出一个父窗口
