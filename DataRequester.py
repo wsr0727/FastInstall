@@ -140,7 +140,7 @@ body_config = {"子包信息": {"加减": {
 }}}
 
 query_config = {"base": ["AcceptVerID=1", "EncryptType=4", "geVerID=1000000"],
-                "首页": ["resourceTypeCode=X2", "routeCode=Index"],
+                "首页": ["resourceTypeCode=X2", "routeCode=Index2"],
                 "脑力开发": ["resourceTypeCode=X2", "routeCode=Expand"],
                 "入园准备": ["resourceTypeCode=X2", "routeCode=School"],
                 "巩固练习": ["resourceTypeCode=X2", "routeCode=Train2"],
@@ -151,12 +151,14 @@ query_config = {"base": ["AcceptVerID=1", "EncryptType=4", "geVerID=1000000"],
 
 args_common = {
     "思维正式": {"安卓-简体": {"platform": "安卓", "version": "", "language": "简体", "environment": "正式线",
-                       "country": "中国大陆"},
-             "谷歌-英语": {"platform": "谷歌", "version": "", "language": "英语", "environment": "正式线",
-                       "country": "美国"},
-             "苹果-简体": {"platform": "iPhone", "version": "", "language": "简体", "environment": "正式线",
-                       "country": "中国大陆"}
-             }
+                               "country": "中国大陆"},
+                 "谷歌-英语": {"platform": "谷歌", "version": "", "language": "英语", "environment": "正式线",
+                               "country": "美国"},
+                 "苹果-简体": {"platform": "iPhone", "version": "", "language": "简体", "environment": "正式线",
+                               "country": "中国大陆"},
+                 "苹果-英语": {"platform": "iPhone", "version": "", "language": "英语", "environment": "正式线",
+                                                   "country": "美国"}
+                 }
 }
 
 

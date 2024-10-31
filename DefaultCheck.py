@@ -5,6 +5,7 @@ import zipfile
 import shutil
 import random
 import json
+from copy import deepcopy
 from DataRequester import args_common, DataRequester, CheckPackageData
 from TaskController import get_file_name_info
 
@@ -168,7 +169,7 @@ class DefaultCheck:
         default_game_md5_data = self.extract_json_data(default_game_md5_path)
 
         image_path_path = self.path_config[file_format]["image_path"]  # 默认1和许多卡片
-        if file_format != "aab" and self.file_exists(self.path_cache + image_path_path):
+        if self.file_exists(self.path_cache + image_path_path):
             # 谷歌包不判断默认数据是否存在
             logging.debug("判断图片文件是否存在")
             image_png = self.count_files(self.path_cache + image_path_path, "png")  # 判断默认图片是否存在
@@ -183,9 +184,6 @@ class DefaultCheck:
                 result["内置图片"].update(
                     {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": i_m_list}], "state": -1,
                      "message": "【音频或内置图片不存在】"})
-        elif file_format == "aab":
-            logging.debug("aab没有内置小测，不判断内置图片")
-            result["内置图片"].update({"state": 0, "message": "【谷歌没有内置小测，不判断aab包的内置图片】", "data": []})
 
         if package_config_zh_data:  # 首页数据-中文
             package_config_zh_result = DateCheck().package_config_check(package_config_zh_data)
