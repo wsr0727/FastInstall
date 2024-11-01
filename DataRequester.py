@@ -232,7 +232,8 @@ def get_PackageIdent_By_Pagedata(pagedata):
     package_idents = []
     for area in pagedata['data']['areaData']:
         for item in area['data']:
-            package_idents.append(item['fieldData']['packageIdent'])
+            if item['dataCode'] != 'ConfigData':
+                package_idents.append(item['fieldData']['packageIdent'])
     return package_idents
 
 
