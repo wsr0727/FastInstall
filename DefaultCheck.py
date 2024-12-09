@@ -220,12 +220,10 @@ class DefaultCheck:
                 {"file_count": file_count, "random_file": package_config_expand_lang_path.split("/")[-1],
                  "data": package_config_expand_lang_result, "state": state, "message": message})
         if default_game_md5_data:
-            status, message, net_game_md5 = 0, "", {}
-            for md5 in default_game_md5_data["item"]:
-                if md5["app_key"] == "math_1andmany":
-                    version = get_file_name_info(self.file_path).get("version")
-                    status, message, net_game_md5 = DateCheck.default_game_md5_check(file_format, md5, version)
-                    break
+            version = get_file_name_info(self.file_path).get("version")
+            status, message, net_game_md5 = DateCheck.default_game_md5_check(file_format,
+                                                                             default_game_md5_data["item"][0], version)
+
             result["内置子包"].update({"state": status, "message": message, "data": [
                 {"内置md5": default_game_md5_data["item"], "服务端md5": net_game_md5}]})
         logging.debug("编辑结果")
@@ -356,6 +354,7 @@ class DateCheck:
     @staticmethod
     def default_game_md5_check(file_format, default_md5, version):
         default_md5_x2 = default_md5["md5"]
+        default_game_key = default_md5["app_key"]
         resource_type_code = ["X2"]
         default_md5_x4 = ""
         if file_format == "aab":
@@ -372,15 +371,15 @@ class DateCheck:
                                        args_["country"])
         net_game_md5 = {}
         for r in resource_type_code:
-            body = data_requester.make_packagedata_body(["math_1andmany"], resource_type_code=r)
+            body = data_requester.make_packagedata_body([default_game_key], resource_type_code=r)
             try:
                 package_data = data_requester.packagedata(body)
             except:
                 return -1, "【无法获取子包服务端MD5，请检查是否在抓包】", net_game_md5
 
             package_data_dict = CheckPackageData(package_data).is_exist_FileInfo(return_array=False)
-            if "math_1andmany" in package_data_dict.keys():
-                net_md5 = package_data_dict["math_1andmany"]["package_file_info"]
+            if default_game_key in package_data_dict.keys():
+                net_md5 = package_data_dict[default_game_key]["package_file_info"]
                 net_game_md5.update({r: net_md5})
 
         if not net_game_md5:

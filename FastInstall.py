@@ -29,7 +29,7 @@ glob.set_gl_ip_history(ip_history)
 class InstallApp:
     def __init__(self, init_window_name):
         self.init_window_name = init_window_name
-        self.init_window_name.title("超好用的测试工具  3.00.08")
+        self.init_window_name.title("超好用的测试工具  3.00.09")
         self.width = 1000
         # self.height = 520
         self.height = 530  # 加上”更多“按钮的高度
@@ -50,30 +50,31 @@ class InstallApp:
 
         # 顶部区域==============================================================
         self.top_frame = Frame(self.init_window_name)
-        self.top_frame.grid(row=0, column=0, columnspan=2)
-        self.massage_label = Label(self.top_frame, text="提示区域", width=70, font="微软雅黑 15 bold")
-        self.massage_label.grid(row=0, column=0, columnspan=2)
+        self.top_frame.grid(row=0, column=0)
+        self.massage_label = Label(self.top_frame, text="提示区域", width=75, font="微软雅黑 15 bold")
+        self.massage_label.grid(row=0, column=0, sticky="N")
 
-        # 左边-上边区域==============================================================
+        # 中间区域==============================================================
         self.install_frame = Frame(self.init_window_name)
-        self.install_frame.grid(row=1, column=0, sticky="N", padx=5)
+        self.install_frame.grid(row=1, column=0, sticky="N")
 
+        # 中间-左边区域==============================================================
         # 模式选择区域-------------------------------------------------------------
-        self.mode_frame = LabelFrame(self.install_frame, text="安装模式选择：", width=self.width / 2)
-        self.mode_frame.grid(row=0, column=0, sticky="N", padx=5)
+        self.mode_frame = LabelFrame(self.install_frame, text="安装模式选择：")
+        self.mode_frame.grid(row=0, column=0)
         self.mode_data = StringVar()
         self.mode_data.set("仅安装")
         mode_list = ["仅安装", "批量出包安装(自动)", "批量出包安装(手动)"]
-        radiobutton_w = int(60 / len(mode_list))
-        for m in range(len(mode_list)):
-            Radiobutton(self.mode_frame, text=mode_list[m], variable=self.mode_data, value=mode_list[m],
-                        indicatoron=False, width=radiobutton_w).grid(row=0, column=m, sticky="N")
+        radiobutton_w = 65 // len(mode_list)
+        for m, mode in enumerate(mode_list):
+            Radiobutton(self.mode_frame, text=mode, variable=self.mode_data, value=mode,
+                        indicatoron=False, width=radiobutton_w).grid(row=0, column=m)
         # 包名区域----------------------
-        self.app_key_frame = LabelFrame(self.install_frame, text="包名：（支持打开网页）", width=self.width / 2)
+        self.app_key_frame = LabelFrame(self.install_frame, text="包名：（支持打开网页）")
         self.app_key_frame.grid(row=1, column=0)
         self.app_key_var = StringVar()
         self.app_key_var.set(app_key)
-        self.app_key_entry = ttk.Combobox(self.app_key_frame, textvariable=self.app_key_var, width=42,
+        self.app_key_entry = ttk.Combobox(self.app_key_frame, textvariable=self.app_key_var, width=45,
                                           values=glob.get_gl_app_key_histroy())
         self.app_key_entry.grid(row=0, column=0)
         self.app_key_entry.bind("<<ComboboxSelected>>", self.app_key_select)
@@ -101,12 +102,12 @@ class InstallApp:
         self.defaule_check_button.grid(row=0, column=0, sticky="E")
 
         # 文本框
-        self.file_path_text = Text(self.file_path_frame, width=64, height=5)
+        self.file_path_text = Text(self.file_path_frame, width=67, height=5)
         self.file_path_text.grid(row=1, column=0)
 
-        # 右边-上边区域==============================================================
+        # 中间-右边区域==============================================================
         # 设备选择区域-------------------------------------------------------------
-        self.devices_frame = LabelFrame(self.install_frame, text="设备选择：（不选默认所有）", width=66)
+        self.devices_frame = LabelFrame(self.install_frame, text="设备选择：（不选默认所有）")
         self.devices_frame.grid(row=0, column=1, rowspan=2)
 
         # WiFi代理
@@ -139,7 +140,7 @@ class InstallApp:
         # 设备刷新按钮
         self.refresh_button = Button(self.devices_frame, text="刷新设备", width=8, command=self.devices_checkbutton)
         self.refresh_button.grid(row=0, column=0, sticky="E")
-        self.devices_checkFrame = Frame(self.devices_frame, width=60)
+        self.devices_checkFrame = Frame(self.devices_frame)
         self.devices_checkFrame.grid(row=1, column=0)
         # 设备复选框
         self.checkboxes = {}
@@ -149,94 +150,57 @@ class InstallApp:
 
         # 按钮区域-------------------------------------------------------------
         self.button_frame = Frame(self.install_frame)
-        self.button_frame.grid(row=2, column=1, padx=8)
+        self.button_frame.grid(row=2, column=1, padx=10)
         self.choose_app_frame = LabelFrame(self.button_frame, text="应用管理：")
-        self.choose_app_frame.grid(row=0, column=0, sticky="N", ipady=2, padx=5, columnspan=2)
+        self.choose_app_frame.grid(row=0, column=0, columnspan=2)
         # 开始按钮
         self.delete_button = Button(self.choose_app_frame, text="卸载应用", width=15,
                                     command=lambda: self.thread_it(self.devices_manager, "delete"))
-        self.delete_button.grid(row=0, column=0, pady=5)
-        self.delete_button = Button(self.choose_app_frame, text="清空应用缓存", width=15,
-                                    command=lambda: self.thread_it(self.devices_manager,
-                                                                   [clear_app, self.app_key_entry.get(), "清空应用"]))
+        self.delete_button.grid(row=0, column=0)
+        self.clear_data_button = Button(self.choose_app_frame, text="清空应用缓存", width=15,
+                                        command=lambda: self.thread_it(self.devices_manager,
+                                                                       [clear_app, self.app_key_entry.get(),
+                                                                        "清空应用"]))
 
-        self.delete_button.grid(row=0, column=1, pady=5)
+        self.clear_data_button.grid(row=0, column=1)
         self.install_button = Button(self.choose_app_frame, text="安装", width=18,
                                      command=lambda: self.thread_it(self.run))
         self.install_button.grid(row=0, column=2)
 
         self.choose_devices_frame = LabelFrame(self.button_frame, text="指令管理：")
-        self.choose_devices_frame.grid(row=1, column=0, sticky="N")
+        self.choose_devices_frame.grid(row=1, column=0, sticky="e")
 
         self.debug_button = Button(self.choose_devices_frame, text="开启调试模式", width=15,
                                    command=lambda: self.devices_manager([release_debug, True, "开启调试模式"]))
-        self.debug_button.grid(row=0, column=0, pady=1)
+        self.debug_button.grid(row=0, column=0)
 
         self.debug_button = Button(self.choose_devices_frame, text="关闭调试模式", width=15,
                                    command=lambda: self.devices_manager([release_debug, False, "关闭调试模式"]))
-        self.debug_button.grid(row=0, column=1, pady=1)
+        self.debug_button.grid(row=0, column=1)
 
         self.setting_button = Button(self.choose_devices_frame, text="打开广告日志", width=14,
                                      command=lambda: self.thread_it(self.devices_manager,
                                                                     [ad_debug, True, "开启ad日志"]))
-        self.setting_button.grid(row=0, column=2, pady=1)
+        self.setting_button.grid(row=0, column=2)
 
         self.setting_frame = LabelFrame(self.button_frame, text="打开设置页面：")
-        self.setting_frame.grid(row=1, column=1, sticky="N")
+        self.setting_frame.grid(row=1, column=1, sticky="e")
 
-        self.setting_lang = Button(self.setting_frame, text="语言", width=5,
+        self.setting_lang = Button(self.setting_frame, text="语言", width=4,
                                    command=lambda: self.thread_it(self.devices_manager,
                                                                   [setting_debug, "语言", "打开语言页面"]))
-        self.setting_lang.grid(row=0, column=0, pady=1)
-        self.setting_data = Button(self.setting_frame, text="时间", width=5,
+        self.setting_lang.grid(row=0, column=0)
+        self.setting_data = Button(self.setting_frame, text="时间", width=4,
                                    command=lambda: self.thread_it(self.devices_manager,
                                                                   [setting_debug, "时间", "打开时间页面"]))
-        self.setting_data.grid(row=0, column=1, pady=1)
-        self.setting_WiFi = Button(self.setting_frame, text="WiFi", width=5,
+        self.setting_data.grid(row=0, column=1)
+        self.setting_WiFi = Button(self.setting_frame, text="WiFi", width=4,
                                    command=lambda: self.thread_it(self.devices_manager,
                                                                   [setting_debug, "WiFi", "打开WiFi页面"]))
-        self.setting_WiFi.grid(row=0, column=2, pady=1)
+        self.setting_WiFi.grid(row=0, column=2)
         # 下方区域==============================================================
         self.log_frame = LabelFrame(self.init_window_name, text="任务列表：(双击任务可复制文件地址)")
-        self.log_frame.grid(row=2, column=0, columnspan=2, padx=10)
-
-        self.log_button_frame = LabelFrame(self.log_frame, text="操作：(默认选第一个")
-        self.log_button_frame.grid(row=0, column=1, sticky="N")
-        btn_w = 15  # 操作按钮区域宽度
-        btn_h = 1  # 操作按钮区域高度
-        # 清空按钮
-        self.clear_button = Button(self.log_button_frame, text="清空任务列表", height=btn_h, width=btn_w,
-                                   command=self.clear_tree)
-        self.clear_button.grid(row=0, column=0)
-
-        # 打开按钮
-        self.open_button = Button(self.log_button_frame, text="打开", height=btn_h, width=btn_w,
-                                  command=lambda: self.task_commend("open"))
-        self.open_button.grid(row=1, column=0)
-
-        # 克隆按钮
-        self.open_button = Button(self.log_button_frame, text="克隆", height=btn_h, width=btn_w,
-                                  command=lambda: self.task_commend("clone"))
-        self.open_button.grid(row=2, column=0)
-
-        # 日志按钮
-        self.open_button = Button(self.log_button_frame, text="日志", height=btn_h, width=btn_w,
-                                  command=lambda: self.task_commend("log"))
-        self.open_button.grid(row=3, column=0)
-        # 设置包名按钮
-        self.open_button = Button(self.log_button_frame, text="设置包名", height=btn_h, width=btn_w,
-                                  command=lambda: self.task_commend("set_app_key"))
-        self.open_button.grid(row=4, column=0)
-        # 继续按钮
-        self.continue_button = Button(self.log_button_frame, text="批量任务继续进行", height=btn_h, width=btn_w,
-                                      command=self.is_continue)
-        self.isContinue = False
-        # 取消按钮
-        self.cancel_button = Button(self.log_button_frame, text="取消后续任务", height=btn_h, width=btn_w,
-                                    command=self.is_cancel)
-        self.isCancel = False
-        # self.continue_button.grid(row=5, column=0)
-        # self.cancel_button.grid(row=6, column=0)
+        self.log_frame.grid(row=2, column=0, padx=18, sticky="n")
 
         # 创建一个Treeview控件
         self.tree = ttk.Treeview(self.log_frame)
@@ -260,13 +224,47 @@ class InstallApp:
 
         self.tree.bind("<Double-Button-1>", self.copy_to_clipboard)
 
+        tree_scrollbar = ttk.Scrollbar(self.log_frame, orient="vertical", command=self.tree.yview)
+        tree_scrollbar.grid(row=0, column=1, sticky="nsw")
+
+        # 将滚动条与 Treeview 关联
+        self.tree.configure(yscrollcommand=tree_scrollbar.set)
+
+        self.log_button_frame = Frame(self.log_frame)
+        self.log_button_frame.grid(row=0, column=2, sticky="ne")
+        btn_w = 12  # 操作按钮区域宽度
+        btn_h = 1  # 操作按钮区域高度
+        # 清空按钮
+        self.clear_button = Button(self.log_button_frame, text="清空任务列表", height=btn_h, width=btn_w,
+                                   command=self.clear_tree)
+        self.clear_button.grid(row=0, column=0)
+
+        buttons = [("打开", "open"),
+                   ("克隆", "clone"),
+                   ("日志", "log"),
+                   ("设置包名", "set_app_key")]
+
+        for row, (text, command) in enumerate(buttons, start=1):
+            Button(self.log_button_frame, text=text, height=btn_h, width=btn_w,
+                   command=lambda cmd=command: self.task_commend(cmd)).grid(row=row, column=0)
+        # 继续按钮
+        self.continue_button = Button(self.log_button_frame, text="批量任务继续", height=btn_h, width=btn_w,
+                                      command=self.is_continue)
+        self.isContinue = False
+        # 取消按钮
+        self.cancel_button = Button(self.log_button_frame, text="取消后续任务", height=btn_h, width=btn_w,
+                                    command=self.is_cancel)
+        self.isCancel = False
+        # self.continue_button.grid(row=5, column=0)
+        # self.cancel_button.grid(row=6, column=0)
+
         # 扩展区域==============================================================
         # 拓展入口开关
         self.expand_Label = Label(self.init_window_name, text="\\v/ 更多")
         self.expand_Label.config(foreground='blue', font=('微软雅黑', 10, 'underline'))
         self.expand_off_Label = Label(self.init_window_name, text="/^\\ 收起")
         self.expand_off_Label.config(foreground='blue', font=('微软雅黑', 10, 'underline'))
-        self.expand_Label.grid(row=3, column=0, sticky="E", ipadx=10)
+        self.expand_Label.grid(row=3, column=0, sticky="E", ipadx=15)
         self.expand_Label.bind("<Button-1>", self.expand_show)
         self.expand_off_Label.bind("<Button-1>", self.expand_close)
 
@@ -281,12 +279,16 @@ class InstallApp:
         # 拓展-输入字符-输入历史
         self.input_histroy = ttk.Treeview(self.expand_frame)
         self.input_histroy.config(height=4)
-        self.input_histroy.column("#0", width=350, anchor="w")
+        self.input_histroy.column("#0", width=340, anchor="w")
         self.input_histroy.heading("#0", text="输入历史(只保存20条，双击可再次输入，右击可选删除)")
         if glob.get_gl_input_list():
             for h in glob.get_gl_input_list():
                 self.input_histroy.insert("", "end", text=h)
         self.input_histroy.bind("<Double-Button-1>", self.click_to_input)
+        self.input_histroy_scrollbar = ttk.Scrollbar(self.expand_frame, orient="vertical",
+                                                     command=self.input_histroy.yview)
+        self.input_histroy.configure(yscrollcommand=self.input_histroy_scrollbar.set)
+
         # 拓展-输入字符-输入历史-右键菜单
         self.input_histroy_menu = Menu(self.input_histroy, tearoff=0)
         self.input_histroy_menu.add_command(label='删除', command=self.delete_selected_item)
@@ -298,7 +300,6 @@ class InstallApp:
         self.input_CaptchaNo = Button(self.expand_frame, text="正式线输入验证码", width=15,
                                       command=lambda: self.thread_it(self.input_captcha_no))
         self.input_CaptchaNo_label = Label(self.expand_frame, text="先选手机号再点")
-
 
     def file_to_app_key(self):
         file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
@@ -322,7 +323,8 @@ class InstallApp:
         self.input_Label.grid(row=0, column=0)
         self.input_entry.grid(row=0, column=1)
         self.input_button.grid(row=0, column=2)
-        self.input_histroy.grid(row=1, column=0, columnspan=4, pady=1)
+        self.input_histroy.grid(row=1, column=0, columnspan=4, padx=5, sticky="W")
+        self.input_histroy_scrollbar.grid(row=1, column=2, sticky="nse")
         self.input_CaptchaNo_test.grid(row=2, column=0, columnspan=2, sticky="W")
         self.input_CaptchaNo.grid(row=2, column=1, ipadx=5)
         self.input_CaptchaNo_label.grid(row=2, column=1, columnspan=2, sticky="E", ipadx=2)
@@ -338,6 +340,7 @@ class InstallApp:
         self.input_entry.grid_remove()
         self.input_button.grid_remove()
         self.input_histroy.grid_remove()
+        self.input_histroy_scrollbar.grid_remove()
         self.input_CaptchaNo.grid_remove()
 
     def input_histroy_list(self, text="", save=True):
@@ -747,6 +750,7 @@ class InstallApp:
         msg = '\n'.join((item.decode("gbk") for item in files))
         self.file_path_text.delete("1.0", "end")
         self.file_path_text.insert("1.0", msg)
+
 
 if __name__ == '__main__':
     init_window = Tk()  # 实例化出一个父窗口
