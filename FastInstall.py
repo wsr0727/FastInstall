@@ -751,7 +751,6 @@ class InstallApp:
         self.file_path_text.delete("1.0", "end")
         self.file_path_text.insert("1.0", msg)
 
-
 if __name__ == '__main__':
     init_window = Tk()  # 实例化出一个父窗口
     InstallApp(init_window)
