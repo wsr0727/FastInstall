@@ -168,23 +168,6 @@ class DefaultCheck:
         package_config_expand_lang_data = self.extract_json_data(package_config_expand_lang_path)
         default_game_md5_data = self.extract_json_data(default_game_md5_path)
 
-        image_path_path = self.path_config[file_format]["image_path"]  # 默认1和许多卡片
-        if self.file_exists(self.path_cache + image_path_path):
-            # 谷歌包不判断默认数据是否存在
-            logging.debug("判断图片文件是否存在")
-            image_png = self.count_files(self.path_cache + image_path_path, "png")  # 判断默认图片是否存在
-            mp3_count = self.count_files(self.path_cache + image_path_path, "mp3")
-            i_m_list = os.listdir(self.path_cache + image_path_path) if os.listdir(
-                self.path_cache + image_path_path) else []
-            if image_png >= 0 and mp3_count >= 0:
-                result["内置图片"].update(
-                    {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": i_m_list}], "state": 0,
-                     "message": ""})
-            elif image_png == -1 or mp3_count == -1:
-                result["内置图片"].update(
-                    {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": i_m_list}], "state": -1,
-                     "message": "【音频或内置图片不存在】"})
-
         if package_config_zh_data:  # 首页数据-中文
             package_config_zh_result = DateCheck().package_config_check(package_config_zh_data)
             state, message = DateCheck().result_state(package_config_zh_result)
@@ -219,13 +202,37 @@ class DefaultCheck:
             result["趣味拓展数据（国际化语言）"].update(
                 {"file_count": file_count, "random_file": package_config_expand_lang_path.split("/")[-1],
                  "data": package_config_expand_lang_result, "state": state, "message": message})
+        default_game = ""
         if default_game_md5_data:
+            default_game = default_game_md5_data["item"][0].get("app_key")
             version = get_file_name_info(self.file_path).get("version")
             status, message, net_game_md5 = DateCheck.default_game_md5_check(file_format,
                                                                              default_game_md5_data["item"][0], version)
 
             result["内置子包"].update({"state": status, "message": message, "data": [
                 {"内置md5": default_game_md5_data["item"], "服务端md5": net_game_md5}]})
+
+        image_path_path = self.path_config[file_format]["image_path"]  # 默认1和许多卡片
+        if self.file_exists(self.path_cache + image_path_path):
+            # 谷歌包不判断默认数据是否存在
+            logging.debug("判断图片文件是否存在")
+            image_png = self.count_files(self.path_cache + image_path_path, "png")  # 判断默认图片是否存在
+            mp3_count = self.count_files(self.path_cache + image_path_path, "mp3")
+            i_m_list = os.listdir(self.path_cache + image_path_path) if os.listdir(
+                self.path_cache + image_path_path) else []
+            state, message = -1, "【未知错误】"
+            if image_png >= 0 and mp3_count >= 0:
+                state, message = 0, ""
+                if default_game and any(default_game not in f for f in i_m_list):
+                    state, message = -1, "【图片名称与内置包名不符】"
+
+            elif image_png == -1 or mp3_count == -1:
+                state, message = -1, "【音频或内置图片不存在】"
+
+            result["内置图片"].update(
+                {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": i_m_list}], "state": state,
+                 "message": message})
+
         logging.debug("编辑结果")
         state, message = DateCheck().final_result(result)
         result["总状态"].update({"state": state, "message": message})
@@ -246,7 +253,7 @@ class DateCheck:
             level_counter = 0
             error_list = []
             level_name = level["style"]["fieldData"]["level"]
-            level_name = "测验卷-"+level_name if level["moduleCode"] == "ExamArea" else level_name
+            level_name = "测验卷-" + level_name if level["moduleCode"] == "ExamArea" else level_name
             for lesson in level["data"]:
                 level_counter += 1
                 if is_lang and lesson["dataCode"] not in ["ConfigData", "SubPackageData"]:
