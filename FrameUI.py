@@ -1,5 +1,5 @@
 from tkinter import *
-from tkinter import  Scrollbar, messagebox
+from tkinter import Scrollbar, messagebox
 import tkinter as tk
 
 """
@@ -23,6 +23,20 @@ content_style = {
     "padx": 10,
     "pady": 5
 }
+
+# 定义表头
+package_headers = (
+    "PackageIdent", "res_type", "lang", "title",
+    "PackageFileInfo_MD5", "LangFileInfo_MD5"
+)
+
+subpackage_headers = (
+    "PackageIdent", "SubPackageID", "SubPackageScence",
+    "ConfigData", "lang", "title",
+    "PackageFileInfo_MD5", "LangFileInfo_MD5"
+)
+
+expand_age_headers = ("区域名称", "子包名称", "年龄（旧）", "年龄（新）", "核心年龄")
 
 
 def show_log(task):
@@ -162,12 +176,12 @@ def copy_to_clipboard(event):
     widget.update()
 
 
-def output_result(result_arr):
+def output_result(result_arr, headers, title="查询结果"):
     if result_arr.size != 0:
         # 创建一个新的Toplevel窗口
         log_top = Toplevel()
-        log_top.title("子包信息查询结果")
-        log_top.minsize(1000, 50)
+        log_top.title(title)
+        log_top.minsize(1100, 800)
         # 创建主框架
         main_frame = Frame(log_top)
         main_frame.pack(fill=BOTH, expand=TRUE)
@@ -182,10 +196,9 @@ def output_result(result_arr):
         table_frame = Frame(canvas)
         # 将table_frame放置在canvas上
         canvas.create_window((0, 0), window=table_frame, anchor='nw')
+
         # 填充内容
-        create_table(table_frame,
-                     ("PackageIdent", "res_type", "lang", "title", "PackageFileInfo_MD5", "LangFileInfo_MD5"),
-                     result_arr)
+        create_table(table_frame, headers, result_arr)
         # 更新canvas的滚动区域
         table_frame.update_idletasks()
         canvas.config(scrollregion=canvas.bbox("all"))

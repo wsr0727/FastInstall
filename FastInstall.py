@@ -8,9 +8,10 @@ from Cache import *
 from FrameUI import show_log
 from TaskController import *
 from Glob import *
-from DataRequester import *
 from LanguageChecker import show_lang_window
 from PackageDataChecker import show_data_check_window
+import requests
+import json
 
 # 日志设置
 # logging.basicConfig(filename='test.log', level=logging.DEBUG,
@@ -29,7 +30,7 @@ glob.set_gl_ip_history(ip_history)
 class InstallApp:
     def __init__(self, init_window_name):
         self.init_window_name = init_window_name
-        self.init_window_name.title("超好用的测试工具  3.00.10")
+        self.init_window_name.title("超好用的测试工具  3.00.11")
         self.width = 1000
         # self.height = 520
         self.height = 530  # 加上”更多“按钮的高度
@@ -750,6 +751,7 @@ class InstallApp:
         msg = '\n'.join((item.decode("gbk") for item in files))
         self.file_path_text.delete("1.0", "end")
         self.file_path_text.insert("1.0", msg)
+
 
 if __name__ == '__main__':
     init_window = Tk()  # 实例化出一个父窗口

@@ -1,6 +1,7 @@
 import copy
 import json
 import logging
+from tkinter import messagebox
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad, pad
 import base64
@@ -106,11 +107,20 @@ header_config = {
 }
 
 host_config = {"正式线": {"matrixdataapi": "https://matrixdataapi.babybus.com",
-                       "packagedataapi": "https://packagedataapi.babybus.com"}}
+                       "packagedataapi": "https://packagedataapi.babybus.com",
+                       "manage": "https://manage.mm.babybus.com"
+                       },
+               "测试线": {"matrixdataapi": "https://matrixdataapi.development.platform.babybus.com",
+                       "packagedataapi": "https://packagedataapi.development.platform.babybus.com",
+                       "manage": "https://manage.tm.babybus.com"
+                       }
+               }
 
 path_config = {"首页": "/BabyMind/PageCenter/PageData",
                "非首页": "/PageCenter/PageData",
-               "子包信息": "/PackageData/GetPackageLangDataList"}
+               "子包信息": "/PackageData/GetPackageLangDataList",
+               "分包信息": "/PackageDataManage/SubPackageInfo/ReadData"
+               }
 
 body_config = {"子包信息": {"加减": {
     "GECocos2DVerID": 1000000,
@@ -151,14 +161,14 @@ query_config = {"base": ["AcceptVerID=1", "EncryptType=4", "geVerID=1000000"],
 
 args_common = {
     "思维正式": {"安卓-简体": {"platform": "安卓", "version": "", "language": "简体", "environment": "正式线",
-                               "country": "中国大陆"},
-                 "谷歌-英语": {"platform": "谷歌", "version": "", "language": "英语", "environment": "正式线",
-                               "country": "美国"},
-                 "苹果-简体": {"platform": "iPhone", "version": "", "language": "简体", "environment": "正式线",
-                               "country": "中国大陆"},
-                 "苹果-英语": {"platform": "iPhone", "version": "", "language": "英语", "environment": "正式线",
-                                                   "country": "美国"}
-                 }
+                       "country": "中国大陆"},
+             "谷歌-英语": {"platform": "谷歌", "version": "", "language": "英语", "environment": "正式线",
+                       "country": "美国"},
+             "苹果-简体": {"platform": "iPhone", "version": "", "language": "简体", "environment": "正式线",
+                       "country": "中国大陆"},
+             "苹果-英语": {"platform": "iPhone", "version": "", "language": "英语", "environment": "正式线",
+                       "country": "美国"}
+             }
 }
 
 
@@ -381,6 +391,87 @@ class DataRequester:
         logging.debug("response:" + json.dumps(response, ensure_ascii=False))
         return response
 
+    def get_subpackage_page_data(self, PackageID):
+        """
+        获取后台分包页面信息
+        :param cookies:
+        :return:
+        """
+        from CookiesFetcher import load_cookies, get_cookies_from_browser, save_cookies
+
+        # 加载Cookie
+        cookies = load_cookies()
+
+        # 如果没有Cookie，则获取新的Cookie
+        if cookies is None:
+            cookies = get_cookies_from_browser(host_config[self.environment]["manage"])
+            save_cookies(cookies)
+
+        url = host_config[self.environment]["manage"] + path_config["分包信息"]
+        params = {
+            'Power_MenuCoteID': '1',
+            'Power_MenuDocumentID': '302',
+            'Power_MenuID': '5abe073aa34648fab985c2f68f733ce0',
+            'Power_ModalType': 'Modal',
+            'Transfer_PackageID': PackageID
+        }
+        # 构建请求的会话
+        session = requests.Session()
+        for cookie in cookies:
+            session.cookies.set(cookie['name'], cookie['value'])
+
+        # 发起请求
+        response = session.post(url, params=params)
+
+        if response.json().get("ResultMessage") == "不好意思，您登录超时，请重新登录":
+            messagebox.showinfo("提示", "登录超时，需要重新获取Cookie...")
+            cookies = get_cookies_from_browser(host_config[self.environment]["manage"])
+            save_cookies(cookies)
+            return self.get_subpackage_page_data(PackageID)
+        return response.json()
+
+
+class PackageData:
+    def __init__(self, package_data):
+        self.package_data = package_data
+
+    def get_packageID_by_packagedata(self):
+        """
+        从子包信息中提取子包ID
+        :return: 子包ID
+        """
+        package_data = self.package_data
+        package_id = package_data['data']['packageDataList'][0]['packageID']
+        return package_id
+
+
+class PageData:
+    def __init__(self, page_data):
+        self.page_data = page_data
+
+    def get_age_config_by_expanddata(self):
+        """
+        从脑力开发页面配置中获取年龄配置
+        :return  result:年龄配置二位数组
+        """
+        # 初始化结果数组
+        result = np.empty((0, 5))
+
+        # 提取 areaName, ageTag, age, coreAge 和 title
+        area_data = self.page_data.get('data', {}).get('areaData', [])
+        for area in area_data:
+            area_name = area.get('areaName', '')  # 获取 areaName
+            area_tabs = area.get('areaTab', [])
+            for tab in area_tabs:
+                title = tab['areaTabName']
+                age_tag = tab['style']['fieldData'].get('ageTag', '')
+                age = tab['style']['fieldData'].get('age', '')
+                core_age = tab['style']['fieldData'].get('coreAge', '')
+                # 拼接成二维数组，顺序为 areaName, title, ageTag, age, coreAge
+                row = [area_name, title, age_tag, age, core_age]
+                result = np.append(result, [row], axis=0)
+        return result
+
 
 # 校验子包信息
 class CheckPackageData:
@@ -440,6 +531,55 @@ class CheckPackageData:
             return result_arr
         else:
             return result_dict
+
+
+class SubPackageData:
+    def __init__(self, subpackage_page_data):
+        self.subpackage_page_data = subpackage_page_data
+
+    def extr_subpackage_info(self):
+        """
+        从分包页面数据中提取分包信息
+        :param subpackage_page_data: 分包页面数据
+        :return subpackage_info: 分包信息列表
+        """
+        subpackage_page_data = self.subpackage_page_data
+        # 检查ResultCode
+        if subpackage_page_data.get("ResultCode") != "0":
+            return None
+
+        subpackage_info = []
+        # 遍历每一个分包数据项
+        for item in subpackage_page_data["Data"]["Data"]:
+            languages = []  # 用于存储语言信息
+            # 使用BeautifulSoup解析分包项中的语言数据
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(item.get("LangsData"), 'html.parser')
+
+            # 提取语言名称和语言值，分别存储在对应的列表中
+            spans_lang_name = soup.find_all("span", class_="el-tag--success")  # 找到所有语言名称的<span>
+            spans_lang_value = soup.find_all("span", style="color:#409eff ")  # 找到所有语言值的<span>
+
+            # 将语言名称和语言值逐一配对并添加到languages列表中
+            for lang_name_span, lang_value_span in zip(spans_lang_name, spans_lang_value):
+                lang_name = lang_name_span.get_text(strip=True)  # 提取语言名称并去掉多余空白
+                lang_value = lang_value_span.get_text(strip=True)  # 提取语言值并去掉多余空白
+                # 将语言信息以字典形式存储
+                languages.append({
+                    "lang_name": lang_name,
+                    "lang_value": lang_value
+                })
+
+            # 将提取的分包信息添加到subpackage_info列表中
+            subpackage_info.append({
+                "SubPackageID": item.get("SubPackageID"),  # 分包ID
+                "SubPackageName": item.get("SubPackageName"),  # 分包名称
+                "SubPackageScence": item.get("SubPackageScence"),  # 分包场景
+                "ConfigData": item.get("ConfigData"),  # 配置数据
+                "SubPackageLangs": item.get("SubPackageLangs"),  # 分包语言
+                "LangsData": languages,  # 语言数据
+            })
+        return subpackage_info
 
 
 class RequestCheck:
@@ -502,16 +642,15 @@ def get_all_lang_packagedatda(idents, platform, version, environment, country):
 
     return result_arr
 
-
-if __name__ == "__main__":
-    # 代码调试
-    args_ = args_common["思维正式"]["谷歌-英语"]
-    data_requester = DataRequester(args_["platform"], "2050170", args_["language"], args_["environment"],
-                                   args_["country"])
-    body = data_requester.make_packagedata_body(["math_1andmany"], resource_type_code="X2")
-    package_data = data_requester.packagedata(body)
-    # package_data = data_requester.page_data("脑力开发")
-    print(package_data)
+# if __name__ == "__main__":
+#     # 代码调试
+#     args_ = args_common["思维正式"]["谷歌-英语"]
+#     data_requester = DataRequester(args_["platform"], "2110120", args_["language"], args_["environment"],
+#                                    args_["country"])
+#     # body = data_requester.make_packagedata_body(["math_1andmany"], resource_type_code="X2")
+#     # package_data = data_requester.packagedata(body)
+#     package_data = data_requester.page_data("脑力开发")
+#     print(package_data)
 # idents = get_PackageIdent_By_Pagedata(DataRequester("安卓", "2050101", "简体", "正式线", "中国大陆").page_data_main())
 # body = make_packagedata_body(idents)
 # DataRequester("安卓", "2050101", "简体", "正式线", "中国大陆").packagedata(body)
