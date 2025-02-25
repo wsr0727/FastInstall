@@ -223,8 +223,10 @@ class DefaultCheck:
             state, message = -1, "【未知错误】"
             if image_png >= 0 and mp3_count >= 0:
                 state, message = 0, ""
-                if default_game and any(default_game not in f for f in i_m_list):
-                    state, message = -1, "【图片名称与内置包名不符】"
+                if default_game:
+                    for f in i_m_list:
+                        if (f.endswith('.png') or f.endswith('.mp3')) and default_game not in f:
+                            state, message = -1, "【图片名称与内置包名不符】"
 
             elif image_png == -1 or mp3_count == -1:
                 state, message = -1, "【音频或内置图片不存在】"
