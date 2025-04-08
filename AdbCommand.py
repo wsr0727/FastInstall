@@ -88,15 +88,20 @@ def luncher_app(device, package_name):
     # 点击政策，没有也会点 不管成功失败
     screen_size = os.popen("adb -s " + device + " shell wm size").read()
     y, x = screen_size.split(":")[-1].strip().split("x")
-    click_y = str(int(int(y) / 2 + 365))
+    click_y = int(int(y) / 2)
     click_x = str(int(int(x) / 2))  # 居中的位置
-    os.popen("adb -s " + device + " shell input touchscreen tap " + click_x + " " + click_y).read()  # 同意政策
+    os.popen(
+        "adb -s " + device + " shell input touchscreen tap " + click_x + " " + str(click_y + 365)).read()  # 同意政策
     time.sleep(1)
-    click_y_2 = str(int(int(y) / 2 + 350))
-    os.popen("adb -s " + device + " shell input touchscreen tap " + click_x + " " + click_y_2).read()  # 同意隐私弹框
+    os.popen(
+        "adb -s " + device + " shell input touchscreen tap " + click_x + " " + str(click_y + 350)).read()  # 同意隐私弹框
+
+    time.sleep(15)
+    os.popen("adb -s " + device + " shell input touchscreen tap " + click_x + " " + str(click_y)).read()  # 选择阶段
+    os.popen("adb -s " + device + " shell input touchscreen tap " + click_x + " " + str(click_y)).read()  # 选择阶段
 
     # 开场动画
-    time.sleep(15)
+    time.sleep(5)
 
 
 def open_app(device, app_name):

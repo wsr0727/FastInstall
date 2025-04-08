@@ -328,11 +328,13 @@ class DateCheck:
     @staticmethod
     def expand_config_check(data):
         count = []
-        hot_num = 0
+        # hot_num = 0
         count_int = 0
         for d in data["areaData"]:
+            if d["moduleCode"] != "Package":
+                continue
             count.append({"区域名": d["areaName"], "课程数据": {}})
-            hot_tab = []
+            # hot_tab = []
             total_stage_error = {}
             for i in d["areaTab"]:
                 total_stage_empty = []
@@ -341,14 +343,14 @@ class DateCheck:
                     if s["fieldData"].get("totalStage") in {"0", None}:
                         total_stage_empty.append(str(s["areaDataID"]) + ":" + s["title"])
 
-                if i["style"]["fieldData"].get("isHot"):
-                    hot_tab.append(i["areaTabName"])
-                    hot_num += 1
+                # if i["style"]["fieldData"].get("isHot"):
+                #     hot_tab.append(i["areaTabName"])
+                #     hot_num += 1
 
                 if total_stage_empty:
                     total_stage_error.update({i["areaTabName"]: total_stage_empty})
-            if hot_tab:
-                count[-1].update({"热门tab": hot_tab})
+            # if hot_tab:
+            #     count[-1].update({"热门tab": hot_tab})
             if total_stage_error:
                 count[-1].update({"无总关卡环节": total_stage_error})
 
@@ -357,7 +359,7 @@ class DateCheck:
                 count_int = count_int + n
 
         package_config_expand_zh_result = [
-            {"level": "趣味拓展", "count": count_int, "热门tab总数": hot_num, "data": count}]
+            {"level": "趣味拓展", "count": count_int,  "data": count}]
         return package_config_expand_zh_result
 
     @staticmethod
