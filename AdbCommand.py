@@ -86,10 +86,9 @@ def luncher_app(device, package_name):
     time.sleep(2)
 
     # 点击政策，没有也会点 不管成功失败
-    screen_size = os.popen("adb -s " + device + " shell wm size").read()
-    y, x = screen_size.split(":")[-1].strip().split("x")
-    click_y = int(int(y) / 2)
-    click_x = str(int(int(x) / 2))  # 居中的位置
+    y, x = get_screen_size(device)
+    click_y = int(y / 2)
+    click_x = str(int(x / 2))  # 居中的位置
     os.popen(
         "adb -s " + device + " shell input touchscreen tap " + click_x + " " + str(click_y + 365)).read()  # 同意政策
     time.sleep(1)
@@ -102,6 +101,17 @@ def luncher_app(device, package_name):
 
     # 开场动画
     time.sleep(5)
+
+
+def get_screen_size(device):
+    """"
+    获取设备分辨率
+    :param device: 设备标识
+    :return: y=宽, x=高
+    """
+    screen_size = os.popen("adb -s " + device + " shell wm size").read()
+    y, x = screen_size.split(":")[-1].strip().split("x")
+    return int(y), int(x)
 
 
 def open_app(device, app_name):
@@ -140,6 +150,39 @@ def release_debug(device, status=True):
     else:
         logging.debug("【关闭正式线调试指令】：" + device)
         os.popen("adb -s " + device + " shell setprop debug.babybus.app none.").read()
+
+
+def setting_resolution(device, resolution_list):
+    """
+    设置设备分辨率
+    :param device: 设备ID
+    :param resolution_list: resolution_list[0]: status 是否已设置分辨率，True 开 ，False 关
+                            resolution_list[1]: width 输入框填写的宽
+                            resolution_list[2]: height 输入框填写的高
+    """
+
+    # 获取当前设备最大分辨率
+    width_max, height_max = get_screen_size(device)
+    status = resolution_list[0]
+    if status:
+        try:
+            width = int(resolution_list[1].get())
+            height = int(resolution_list[2].get())
+
+            # 检查是否在指定范围内
+            if 0 < width <= width_max and 0 < height <= height_max:
+                resolution = f"{width}x{height}"
+                logging.debug(f"【设置分辨率】：{resolution}")
+                os.popen(f"adb -s {device} shell wm size {resolution}").read()
+            else:
+                logging.debug("请检查分辨率设置：分辨率超出允许范围。")
+
+        except ValueError:
+            logging.debug("请输入有效的数字作为宽度和高度。")
+
+    else:
+        logging.debug("【恢复分辨率】：" + device)
+        os.popen("adb -s " + device + " shell wm size reset").read()
 
 
 def ad_debug(device, status=True):

@@ -199,6 +199,7 @@ class InstallApp:
                                    command=lambda: self.thread_it(self.devices_manager,
                                                                   [setting_debug, "WiFi", "打开WiFi页面"]))
         self.setting_WiFi.grid(row=0, column=2)
+
         # 下方区域==============================================================
         self.log_frame = LabelFrame(self.init_window_name, text="任务列表：(双击任务可复制文件地址)")
         self.log_frame.grid(row=2, column=0, padx=18, sticky="n")
@@ -270,15 +271,16 @@ class InstallApp:
         self.expand_off_Label.bind("<Button-1>", self.expand_close)
 
         # 拓展-输入字符
-        self.expand_frame = LabelFrame(self.init_window_name, text="指定设备上输入字符：")
-        self.input_Label = Label(self.expand_frame, text="内容：")
+        self.expand_frame = Frame(self.init_window_name)
+        self.captcha_frame = LabelFrame(self.expand_frame, text="指定设备上输入字符：")
+        self.input_Label = Label(self.captcha_frame, text="内容：")
         self.input_var = StringVar()
-        self.input_entry = Entry(self.expand_frame, textvariable=self.input_var, width=40)
-        self.input_button = Button(self.expand_frame, text="输入",
+        self.input_entry = Entry(self.captcha_frame, textvariable=self.input_var, width=40)
+        self.input_button = Button(self.captcha_frame, text="输入",
                                    command=lambda: self.thread_it(self.devices_manager,
                                                                   [self.input_task, "", "输入字符"]))
         # 拓展-输入字符-输入历史
-        self.input_histroy = ttk.Treeview(self.expand_frame)
+        self.input_histroy = ttk.Treeview(self.captcha_frame)
         self.input_histroy.config(height=4)
         self.input_histroy.column("#0", width=340, anchor="w")
         self.input_histroy.heading("#0", text="输入历史(只保存20条，双击可再次输入，右击可选删除)")
@@ -286,7 +288,7 @@ class InstallApp:
             for h in glob.get_gl_input_list():
                 self.input_histroy.insert("", "end", text=h)
         self.input_histroy.bind("<Double-Button-1>", self.click_to_input)
-        self.input_histroy_scrollbar = ttk.Scrollbar(self.expand_frame, orient="vertical",
+        self.input_histroy_scrollbar = ttk.Scrollbar(self.captcha_frame, orient="vertical",
                                                      command=self.input_histroy.yview)
         self.input_histroy.configure(yscrollcommand=self.input_histroy_scrollbar.set)
 
@@ -296,11 +298,33 @@ class InstallApp:
         self.input_histroy.bind('<Button-3>', self.show_context_menu)
 
         # 拓展-输入字符-按钮
-        self.input_CaptchaNo_test = Button(self.expand_frame, text="测试线输入验证码", width=15,
+        self.input_CaptchaNo_test = Button(self.captcha_frame, text="测试线输入验证码", width=15,
                                            command=lambda: self.thread_it(self.input_captcha_no, "test"))
-        self.input_CaptchaNo = Button(self.expand_frame, text="正式线输入验证码", width=15,
+        self.input_CaptchaNo = Button(self.captcha_frame, text="正式线输入验证码", width=15,
                                       command=lambda: self.thread_it(self.input_captcha_no))
-        self.input_CaptchaNo_label = Label(self.expand_frame, text="先选手机号再点")
+        self.input_CaptchaNo_label = Label(self.captcha_frame, text="先选手机号再点")
+
+        # 右侧设置设备分辨率
+        self.resolution_frame = LabelFrame(self.expand_frame, text="设置设备分辨率：")
+        self.width_Label = Label(self.resolution_frame, text="宽度：")
+        self.width_var = StringVar()
+        self.width_entry = Entry(self.resolution_frame, textvariable=self.width_var, width=10)
+        self.height_Label = Label(self.resolution_frame, text="高度：")
+        self.height_var = StringVar()
+        self.height_entry = Entry(self.resolution_frame, textvariable=self.height_var, width=10)
+
+        # 默认宽高，使用录屏尺寸
+        self.width_var.set("1080")
+        self.height_var.set("1920")
+
+        self.resolution_button_start = Button(self.resolution_frame, text="设置设备分辨率", width=15,
+                                              command=lambda: self.devices_manager(
+                                                  [setting_resolution, [True, self.width_entry, self.height_entry],
+                                                   "设置分辨率"]))
+
+        self.resolution_button_close = Button(self.resolution_frame, text="恢复设备分辨率", width=15,
+                                              command=lambda: self.devices_manager(
+                                                  [setting_resolution, [False], "恢复分辨率"]))
 
     def file_to_app_key(self):
         file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
@@ -320,7 +344,8 @@ class InstallApp:
         self.expand_Label.grid_remove()
         self.expand_off_Label.grid(row=3, column=0, sticky="E", ipadx=10)
 
-        self.expand_frame.grid(row=4, column=0, sticky="NW", padx=15)
+        self.expand_frame.grid(row=4, column=0, sticky="NW")
+        self.captcha_frame.grid(row=0, column=0, sticky="NW", padx=15)
         self.input_Label.grid(row=0, column=0)
         self.input_entry.grid(row=0, column=1)
         self.input_button.grid(row=0, column=2)
@@ -329,6 +354,14 @@ class InstallApp:
         self.input_CaptchaNo_test.grid(row=2, column=0, columnspan=2, sticky="W")
         self.input_CaptchaNo.grid(row=2, column=1, ipadx=5)
         self.input_CaptchaNo_label.grid(row=2, column=1, columnspan=2, sticky="E", ipadx=2)
+
+        self.resolution_frame.grid(row=0, column=1, sticky="NW", padx=15)
+        self.width_Label.grid(row=0, column=0)
+        self.width_entry.grid(row=0, column=1)
+        self.height_Label.grid(row=0, column=2)
+        self.height_entry.grid(row=0, column=3)
+        self.resolution_button_start.grid(row=1, column=0, columnspan=2)
+        self.resolution_button_close.grid(row=1, column=2, columnspan=2)
 
     def expand_close(self, event):
         self.height = 530

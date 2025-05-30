@@ -124,7 +124,6 @@ def thread_it(func, *args):
 
 
 class ExcelProcess:
-    """表格相关方法"""
 
     @staticmethod
     def read_excel_1st_col_as_dict(excel_file_path):
@@ -149,7 +148,6 @@ class ExcelProcess:
                     audio_list.append(cell_value)
 
             feedback_audios[name] = audio_list
-        print(feedback_audios)
         return feedback_audios
 
     @staticmethod
@@ -164,7 +162,6 @@ class ExcelProcess:
             cell_value = sheet.cell_value(row_index, 0)  # 获取第一列的值
             if cell_value:  # 过滤掉空值
                 first_column_list.append(cell_value)
-        print(first_column_list)
         return first_column_list
 
 
@@ -418,7 +415,7 @@ class LanguageChecker:
         if not feedback_excel:
             self.insert_text(self.excel_log_text, "请输入外包反馈表格地址", "失败")
             return
-        audio_dict = ExcelProcess().read_excel_1st_col_as_dict(feedback_excel)
+        audio_dict = ExcelProcess.read_excel_1st_col_as_dict(feedback_excel)
         # 去除“.mp3”后缀
         shared_audio_by_lang = {lang: [filename.replace('.mp3', '') for filename in filenames] for lang, filenames in
                                 self.shared_audio_by_lang.items()}
@@ -443,7 +440,7 @@ class LanguageChecker:
         self.delete_text(self.excel_log_text)
 
         excel_path = self.get_text(self.excel_file_path_text2)  # 差异表，即正确音频目录
-        result_list = ExcelProcess().read_excel_1st_col_as_list(excel_path)
+        result_list = ExcelProcess.read_excel_1st_col_as_list(excel_path)
 
         game_lang_path = self.get_text(self.file_path_text2)  # 音频路径
         self.insert_text(self.excel_log_text, "解压中....", "标题")
