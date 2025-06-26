@@ -455,20 +455,33 @@ class PageData:
         :return  result:年龄配置二位数组
         """
         # 初始化结果数组
-        result = np.empty((0, 5))
-
-        # 提取 areaName, ageTag, age, coreAge 和 title
+        result = np.empty((0, 7))
+        class_id = {"2": "入园准备", "3": "小班", "4": "中班", "5": "大班", "6": "一年级"}
+        # 提取 areaName, stageSort, ageTag, age, coreAge 和 title
         area_data = self.page_data.get('data', {}).get('areaData', [])
         for area in area_data:
             area_name = area.get('areaName', '')  # 获取 areaName
+
+            # 获取 区域排序
+            area_sort = area.get('style', '').get('fieldData', '').get('stageSort', '')
+            stage_sort = ""
+            for s in area_sort:
+                stage_sort = stage_sort + class_id[s['stageAge']] + "：" + s['sortIndex'] + "\n"
             area_tabs = area.get('areaTab', [])
+
             for tab in area_tabs:
                 title = tab['areaTabName']
+                is_pay = tab['data'][0]['fieldData'].get('isPay', True) if tab['data'] else True  # 是否是付费子包
+                is_free = f"\n(试玩{tab['data'][0]['fieldData'].get('freeStage', 0)}关)" if not is_pay else ""  # 获取免费子包试玩关卡
+
+                package_ident = tab['data'][0]['fieldData']['packageIdent'] if tab['data'] else ""  # 子包的唯一标识，取首个分包的唯一标识
+
                 age_tag = tab['style']['fieldData'].get('ageTag', '')
                 age = tab['style']['fieldData'].get('age', '')
                 core_age = tab['style']['fieldData'].get('coreAge', '')
-                # 拼接成二维数组，顺序为 areaName, title, ageTag, age, coreAge
-                row = [area_name, title, age_tag, age, core_age]
+
+                # 拼接成二维数组，顺序为 areaName, stage_sort, title, ageTag, age, coreAge
+                row = [area_name, stage_sort, title + is_free, package_ident, age_tag, age, core_age]
                 result = np.append(result, [row], axis=0)
         return result
 

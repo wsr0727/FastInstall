@@ -36,7 +36,7 @@ subpackage_headers = (
     "PackageFileInfo_MD5", "LangFileInfo_MD5"
 )
 
-expand_age_headers = ("区域名称", "子包名称", "年龄（旧）", "年龄（新）", "核心年龄")
+expand_age_headers = ("区域名称", "区域排序", "子包名称", "子包标识", "年龄（旧）", "年龄（新）", "核心年龄")
 
 
 def show_log(task):
@@ -181,7 +181,7 @@ def output_result(result_arr, headers, title="查询结果"):
         # 创建一个新的Toplevel窗口
         log_top = Toplevel()
         log_top.title(title)
-        log_top.minsize(1100, 800)
+        log_top.minsize(1100, 750)
         # 创建主框架
         main_frame = Frame(log_top)
         main_frame.pack(fill=BOTH, expand=TRUE)

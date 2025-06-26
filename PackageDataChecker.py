@@ -7,7 +7,7 @@ from FrameUI import *
 class PackageDataChecker:
     def __init__(self, data_check_window):
         self.data_check_window = data_check_window
-        self.data_check_window.title("数据核验工具 1.00.01")
+        self.data_check_window.title("数据核验工具 1.00.02")
         self.width = 600
         self.height = 300
         self.data_check_window.geometry(str(self.width) + 'x' + str(self.height))
@@ -15,19 +15,19 @@ class PackageDataChecker:
         self.packagedata_frame = LabelFrame(self.data_check_window)
 
         self.country_label = Label(self.packagedata_frame, text="国家：", width=12)
-        self.country = ttk.Combobox(self.packagedata_frame, value=list(header_config["country"].keys()), width=20)
+        self.country = ttk.Combobox(self.packagedata_frame, values=list(header_config["country"].keys()), width=20)
         self.country.current(0)
 
         self.language_label = Label(self.packagedata_frame, text="语言：", width=12)
-        self.language = ttk.Combobox(self.packagedata_frame, value=list(header_config["language"].keys()), width=20)
+        self.language = ttk.Combobox(self.packagedata_frame, values=list(header_config["language"].keys()), width=20)
         self.language.current(0)
 
         self.platform_label = Label(self.packagedata_frame, text="平台：", width=12)
-        self.platform = ttk.Combobox(self.packagedata_frame, value=list(header_config["platform"].keys()), width=20)
+        self.platform = ttk.Combobox(self.packagedata_frame, values=list(header_config["platform"].keys()), width=20)
         self.platform.current(0)
 
         self.resourceTypeCode_label = Label(self.packagedata_frame, text="资源：", width=12)
-        self.resourceTypeCode = ttk.Combobox(self.packagedata_frame, value=["X2", "X4"], width=20)
+        self.resourceTypeCode = ttk.Combobox(self.packagedata_frame, values=["X2", "X4"], width=20)
         self.resourceTypeCode.current(0)
 
         self.validate_command = self.packagedata_frame.register(self.validate_input)
@@ -38,7 +38,7 @@ class PackageDataChecker:
                                    validatecommand=(self.validate_command, "%S"), width=20)
 
         self.environment_label = Label(self.packagedata_frame, text="环境：", width=12)
-        self.environment = ttk.Combobox(self.packagedata_frame, value=["正式线", "测试线"], width=20)
+        self.environment = ttk.Combobox(self.packagedata_frame, values=["正式线", "测试线"], width=20)
         self.environment.current(0)
 
         self.package_ident = Label(self.packagedata_frame, text="子包标识：", width=10)
@@ -160,3 +160,9 @@ class PackageDataChecker:
 def show_data_check_window():
     data_check_toplevel = Toplevel()
     PackageDataChecker(data_check_toplevel)
+
+
+if __name__ == '__main__':
+    data_check_window = Tk()  # 实例化出一个父窗口
+    PackageDataChecker(data_check_window)
+    data_check_window.mainloop()
