@@ -22,7 +22,10 @@ def get_devices_all():
 
 # 输入指定字符
 def input_text(device, text):
-    command = 'adb -s ' + device + ' shell input text ' + text
+
+    text = text.replace('"', '\\"') if '"' in text else text
+    text = text.strip().rstrip()
+    command = 'adb -s ' + device + ' shell input text ' + f"'{text}'"
     os.popen(command).read()
 
 
