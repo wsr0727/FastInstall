@@ -56,7 +56,7 @@ def get_packages_list(device):
 
 def get_adress(adress):
     logging.debug("正在处理的目录：" + adress)
-    extensions = ['.apk', '.ipa', '.aab', '.json']  # 只读取这些文件类型的路径
+    extensions = ['.apk', '.ipa', '.aab','hap', '.json']  # 只读取这些文件类型的路径
     if os.path.isdir(adress):
         adress_list = ['{}/{}'.format(adress, f) for f in os.listdir(adress) if any(ext in f for ext in extensions)]
     else:
