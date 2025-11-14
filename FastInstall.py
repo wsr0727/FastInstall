@@ -30,7 +30,7 @@ glob.set_gl_ip_history(ip_history)
 class InstallApp:
     def __init__(self, init_window_name):
         self.init_window_name = init_window_name
-        self.init_window_name.title("超好用的测试工具  3.00.15")
+        self.init_window_name.title("超好用的测试工具  3.00.16")
         self.width = 1000
         # self.height = 520
         self.height = 530  # 加上”更多“按钮的高度
@@ -92,10 +92,6 @@ class InstallApp:
         self.file_app_button = Button(self.file_path_frame, text="识别包名并设置", width=15,
                                       command=self.file_to_app_key)
         self.file_app_button.grid(row=0, column=0, sticky="W")
-
-        self.course_defaule_button = Button(self.file_path_frame, text="科学默认数据", width=10,
-                                            command=lambda: self.thread_it(self.default_check, None, "course"))
-        self.course_defaule_button.grid(row=0, column=0)
 
         # 核验思维默认数据
         self.defaule_check_button = Button(self.file_path_frame, text="核验思维默认数据", width=15,
@@ -683,7 +679,7 @@ class InstallApp:
             if i["序号"] == task_id:
                 return i
 
-    def default_check(self, task=None, app_name=""):
+    def default_check(self, task=None):
         if not task:
             file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
             file_list = get_adress(file_path_data)
@@ -698,10 +694,7 @@ class InstallApp:
             task_id = task_control(path=f, status="核验包数据")
             self.massage_label.config(text="检测默认数据，第" + str(index + 1) + "个安装包")
 
-            if app_name == "course":
-                result = DefaultCheck(f).course_check()
-            else:
-                result = DefaultCheck(f).main()
+            result = DefaultCheck(f).main()
 
             item_id = self.get_task(task_id)["item_id"]
             if result["总状态"]["state"] == 0:
@@ -710,26 +703,25 @@ class InstallApp:
             elif result["总状态"]["state"] == -1:
                 task_control(task_id=task_id, path=f, device="", status="核验包失败", log=result)
                 self.set_state_tree(item_id, "核验包失败")
+
         self.massage_label.config(text="检测默认数据完成")
 
-    def run_install(self, path, devices_list, appkey=None, is_luncher=False):
+    def run_install(self, path, devices_list, app_key_run=None, is_luncher=False):
         # 卸载、安装、启动、点击协议
         for device in devices_list:
             task_id = task_control(path=path, device=device, status="安装进行中")
-            if appkey:
-                uninstall(device, appkey)
+            if app_key_run:
+                uninstall(device, app_key_run)
             appkey_list = adb_install(device, path)  # 安装,获取包名
             item_id = self.get_task(task_id)["item_id"]
             if appkey_list:
                 task_control(path=path, device=device, status="安装成功", app_id=appkey_list[0], task_id=task_id)
                 self.set_state_tree(item_id, "安装成功")
                 if is_luncher:
-                    appkey = appkey_list[0][0]
-                    luncher_app(device, appkey)
+                    luncher_app(device, app_key_run)
             else:
                 task_control(path=path, device=device, status="安装失败", task_id=task_id)
                 self.set_state_tree(item_id, "安装失败")
-        return appkey
 
     def run(self):
         file_path_data = str(self.file_path_text.get("1.0", "end")).rstrip().lstrip()
@@ -740,35 +732,37 @@ class InstallApp:
         else:
             select_devices = self.devices_checkbutton_get()
             file_list = get_adress(file_path_data)
-            app_key_run = None
-            for index, f in enumerate(file_list):
+            self.cancel_button.grid(row=6, column=0)
+            for index, path in enumerate(file_list):
                 if self.isCancel:
                     self.isCancel = False
+                    self.massage_label.config(text="批量任务取消")
                     break
                 if self.mode_data.get() == "仅安装":
-                    self.thread_it(self.run_install, f, select_devices)
+                    self.thread_it(self.run_install, path, select_devices)
                 else:
                     self.massage_label.config(text="批量任务进行中：第" + str(index + 1) + "个安装包开始")
-                    app_key_run = self.run_install(f, select_devices, app_key_run, True)
+                    app_key_run = get_file_name_info(path).get("app_key")
+                    self.run_install(path, select_devices, app_key_run, True)
                     self.massage_label.config(text="批量任务进行中：第" + str(index + 1) + "个安装包结束")
                     if index != len(file_list) - 1 and self.mode_data.get() == "批量出包安装(手动)":
                         self.continue_button.grid(row=5, column=0)
-                        self.cancel_button.grid(row=6, column=0)
                         while not self.isContinue:
                             if self.isCancel:
                                 self.massage_label.config(text="批量任务取消")
                                 break
                         self.continue_button.grid_remove()
-                        self.cancel_button.grid_remove()
                         self.isContinue = False
                     elif index == len(file_list) - 1:
                         self.massage_label.config(text="批量任务结束")
+            self.cancel_button.grid_remove()
 
     def is_continue(self):
         self.isContinue = True
 
     def is_cancel(self):
         self.isCancel = True
+        self.massage_label.config(text="批量任务取消中，等待当前任务结束。。。")
 
     @staticmethod
     def thread_it(func, *args):

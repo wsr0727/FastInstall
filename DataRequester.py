@@ -116,6 +116,7 @@ host_config = {"正式线": {"matrixdataapi": "https://matrixdataapi.babybus.com
                        }
                }
 
+
 path_config = {"首页": "/BabyMind/PageCenter/PageData",
                "非首页": "/PageCenter/PageData",
                "子包信息": "/PackageData/GetPackageLangDataList",
@@ -170,6 +171,7 @@ args_common = {
                        "country": "美国"}
              }
 }
+
 
 
 def aes_decrypt(cipher_text):
@@ -456,7 +458,7 @@ class PageData:
         """
         # 初始化结果数组
         result = np.empty((0, 7))
-        class_id = {"2": "入园准备", "3": "小班", "4": "中班", "5": "大班", "6": "一年级"}
+        class_id = {"2": "入园准备", "3": "小班", "4": "中班", "5": "大班", "6": "一年级", "7": "二年级"}
         # 提取 areaName, stageSort, ageTag, age, coreAge 和 title
         area_data = self.page_data.get('data', {}).get('areaData', [])
         for area in area_data:

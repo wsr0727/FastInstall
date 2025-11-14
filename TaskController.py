@@ -2,6 +2,10 @@ from copy import deepcopy
 from Glob import *
 import re
 from pathlib import Path
+import logging
+import os
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
 
 
 class TaskListObserver:
@@ -87,6 +91,16 @@ def get_file_name_info(file_name):
         if "com." in i:
             result.update({"app_key": i})
     return result
+
+
+def get_adress(adress):
+    logging.debug("正在处理的目录：" + adress)
+    extensions = ['.apk', '.ipa', '.aab', 'hap', '.json']  # 只读取这些文件类型的路径
+    if os.path.isdir(adress):
+        adress_list = ['{}/{}'.format(adress, f) for f in os.listdir(adress) if any(ext in f for ext in extensions)]
+    else:
+        adress_list = [item for item in adress.split("\n") if any(ext in item for ext in extensions)]
+    return adress_list
 
 
 if __name__ == '__main__':

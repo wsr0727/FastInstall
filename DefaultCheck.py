@@ -97,33 +97,6 @@ class DefaultCheck:
         """判断文件存在并且不为空"""
         return os.path.exists(file_path) and os.stat(file_path).st_size > 0
 
-    def course_check(self):
-        path_config = {
-            "apk": {"default_game_path": "/assets/subapp_u2d/default_game.json"}
-        }
-        result = {"总状态": {"state": -1, "data": 0, "message": "失败"},
-                  "内置子包": {"state": -1, "message": "【内置子包文件不存在】", "data": []}
-                  }
-        logging.debug("判断文件格式")
-        file_format = self.file_format()
-        if not file_format:
-            result["总状态"]["message"] = "文件格式错误"
-            return result
-
-        logging.debug("解压文件")
-        self.zip_file()
-        default_game_md5_path = path_config[file_format]["default_game_path"]  # 默认子包
-        default_game_md5_data = self.extract_json_data(default_game_md5_path)
-        if default_game_md5_data:
-            result["内置子包"].update({"state": 0, "message": "", "data": default_game_md5_data["item"]})
-        state, message = DateCheck().final_result(result)
-        result["总状态"].update({"state": state, "message": message})
-
-        logging.debug("删除解压文件缓存")
-        shutil.rmtree(self.path_cache)  # 删除解压后的文件
-        logging.debug(json.dumps(result))
-        return result
-
     def main(self):
         # state：-1 失败，0 成功。 message: 文件默认不存在
         result = {"总状态":
@@ -274,22 +247,15 @@ class DateCheck:
         """判断默认数据是否正常"""
         package_config_check_result = []
         for level in data["areaData"]:
-            level_counter = 0
             error_list = []
             level_name = level["style"]["fieldData"]["level"]
             level_name = "测验卷-" + level_name if level["moduleCode"] == "ExamArea" else level_name
-            for lesson in level["data"]:
-                level_counter += 1
-                if is_lang and lesson["dataCode"] not in ["ConfigData", "SubPackageData"]:
-                    # 国际化默认数据 且 数据类型非配置类型、非分包类型 才会判断是否配置了MV环节
-                    if any(t["type"] == "mv" for t in lesson["fieldData"]["stepConfig"]):
-                        error_list.append({
-                            "areaDataID": lesson["areaDataID"],
-                            "id": lesson["id"],
-                            "title": lesson["title"],
-                            "packageIdent": lesson["fieldData"]["packageIdent"],
-                            "lang": lesson["fieldData"]["lang"]
-                        })
+
+            if level["moduleCode"] == "UnitCourse":
+                # 二年级为3层数据结构比较特殊，单独处理
+                level_counter = len(level["areaTab"])
+            else:
+                level_counter = len(level["data"])
 
             package_config_check_result.append({
                 "level": level_name,
@@ -303,14 +269,14 @@ class DateCheck:
     def result_state(result):
         message = ""
         check = 0
-        for l in result:
-            if l["count"] <= 0:
+        for level in result:
+            if level["count"] <= 0:
                 check -= 1
-                message += "【level" + l["level"] + "没有课程】"
+                message += "【level" + level["level"] + "没有课程】"
 
-            if l["error"]:
+            if level["error"]:
                 check -= 1
-                message += "【level" + l["level"] + "国际化下存在MV环节】"
+                message += "【level" + level["level"] + "国际化下存在MV环节】"
         if len(result) <= 3:
             check -= 1
             message += "【只有" + str(len(result)) + "个level，检查数量】"
@@ -331,8 +297,7 @@ class DateCheck:
         if count <= 0:
             message += "【趣味拓展没有配置课程】"
             check -= 1
-        # else:
-        #     message += "【趣味拓展总课程数量：" + str(count) + "】"
+
         state = -1 if check < 0 else 0
         return state, message
 
@@ -350,13 +315,11 @@ class DateCheck:
     @staticmethod
     def expand_config_check(data):
         count = []
-        # hot_num = 0
         count_int = 0
         for d in data["areaData"]:
             if d["moduleCode"] != "Package":
                 continue
             count.append({"区域名": d["areaName"], "课程数据": {}})
-            # hot_tab = []
             total_stage_error = {}
             for i in d["areaTab"]:
                 total_stage_empty = []
@@ -365,14 +328,9 @@ class DateCheck:
                     if s["fieldData"].get("totalStage") in {"0", None}:
                         total_stage_empty.append(str(s["areaDataID"]) + ":" + s["title"])
 
-                # if i["style"]["fieldData"].get("isHot"):
-                #     hot_tab.append(i["areaTabName"])
-                #     hot_num += 1
-
                 if total_stage_empty:
                     total_stage_error.update({i["areaTabName"]: total_stage_empty})
-            # if hot_tab:
-            #     count[-1].update({"热门tab": hot_tab})
+
             if total_stage_error:
                 count[-1].update({"无总关卡环节": total_stage_error})
 

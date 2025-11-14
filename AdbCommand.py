@@ -54,16 +54,6 @@ def get_packages_list(device):
     return packages_list
 
 
-def get_adress(adress):
-    logging.debug("正在处理的目录：" + adress)
-    extensions = ['.apk', '.ipa', '.aab','hap', '.json']  # 只读取这些文件类型的路径
-    if os.path.isdir(adress):
-        adress_list = ['{}/{}'.format(adress, f) for f in os.listdir(adress) if any(ext in f for ext in extensions)]
-    else:
-        adress_list = [item for item in adress.split("\n") if any(ext in item for ext in extensions)]
-    return adress_list
-
-
 # 卸载手机上所有应用
 def uninstall(device, package_name):
     uninstall_command = os.popen('adb -s ' + device + " uninstall " + package_name).read()
