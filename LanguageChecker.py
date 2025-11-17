@@ -332,7 +332,7 @@ class LanguageChecker:
 
     def check_files_in_folders(self, folder1, folder2):
         """检查文件夹1内的文件是否在文件夹2中存在，并比较MD5值"""
-        latest_files = self.latest_files(folder1)  # 获取文件夹内新更新的音频，用于外包反馈核对
+        latest_files = self.latest_files(folder1) if self.latest_files(folder1) else []  # 获取文件夹内新更新的音频，用于外包反馈核对
         for root, _, files in os.walk(folder1):
             for file in files:
                 file1_path = os.path.join(root, file)
@@ -424,12 +424,13 @@ class LanguageChecker:
         for key in audio_dict.keys():
             self.insert_text(self.excel_log_text, f"----【{key}】----", "标题")
             if key not in shared_audio_by_lang.keys():
-                self.insert_text(self.excel_log_text, f"    共享文件中缺少补配文件。", "失败")
+                self.insert_text(self.excel_log_text, f"    共享文件中缺少补配文件。\n    {key}", "失败")
                 continue
-            if set(audio_dict[key]) != set(shared_audio_by_lang[key]):
-                for audio in audio_dict[key]:
-                    if audio not in set(shared_audio_by_lang[key]):
-                        self.insert_text(self.excel_log_text, f"    共享文件中音频：{audio} 未更新", "失败")
+
+            # 找出表格里有，但共享文件里没有的音频文件
+            audio_difference = set(audio_dict[key]) - set(shared_audio_by_lang[key])
+            if audio_difference:
+                self.insert_text(self.excel_log_text, f"    共享文件中音频：{audio_difference} 未更新", "失败")
             else:
                 self.insert_text(self.excel_log_text, f"    无异常，音频列表：\n    {audio_dict[key]}", "成功")
 

@@ -157,17 +157,18 @@ class DefaultCheck:
             package_config_zh_data = self.extract_json_data(package_config_zh_path)
             package_config_expand_zh_data = self.extract_json_data(package_config_expand_zh_path)
 
-        if package_config_zh_data:  # 首页数据-中文
+        # 核验首页数据-中文
+        if package_config_zh_data:
             package_config_zh_result = DateCheck().package_config_check(package_config_zh_data)
             state, message = DateCheck().result_state(package_config_zh_result)
             result["首页数据（简体中文）"].update(
                 {"data": package_config_zh_result, "state": state, "message": message})
 
+        # 核验首页数据-国际化
         if file_format == "apk" or "hap":  # 首页数据-多语言
             result["首页数据（国际化语言）"].update({"state": 0, "message": "【apk和hap不判断海外(首页数据-多语言）文件】"})
         elif package_config_lang_data:  # 首页数据-多语言
-            package_config_lang_result = DateCheck().package_config_check(package_config_lang_data,
-                                                                          is_lang=True)
+            package_config_lang_result = DateCheck().package_config_check(package_config_lang_data)
             file_count = self.count_files(self.path_cache + self.path_config[file_format]["package_config_path"],
                                           "json")
             result["首页数据（国际化语言）"].update(
@@ -176,6 +177,7 @@ class DefaultCheck:
             state, message = DateCheck().result_state(package_config_lang_result)
             result["首页数据（国际化语言）"].update({"state": state, "message": message})
 
+        # 核验趣味拓展-中文
         if package_config_expand_zh_data:  # 趣味拓展-中文
             package_config_expand_zh_result = DateCheck().expand_config_check(
                 package_config_expand_zh_data)
@@ -183,6 +185,7 @@ class DefaultCheck:
             result["趣味拓展数据（简体中文）"].update(
                 {"data": package_config_expand_zh_result, "state": state, "message": message})
 
+        # 核验趣味拓展-多语言
         if file_format == "apk" or 'hap':  # 趣味拓展-多语言
             result["趣味拓展数据（国际化语言）"].update(
                 {"state": 0, "message": "【apk和hap不判断海外（趣味拓展-多语言）文件】"})
@@ -195,8 +198,9 @@ class DefaultCheck:
             result["趣味拓展数据（国际化语言）"].update(
                 {"file_count": file_count, "random_file": package_config_expand_lang_path.split("/")[-1],
                  "data": package_config_expand_lang_result, "state": state, "message": message})
-        default_game = ""
 
+        # 获取内置子包的信息
+        default_game = ""
         if default_game_md5_data:
             default_game = default_game_md5_data["item"][0].get("app_key")
             version = get_file_name_info(self.file_path).get("version")
@@ -208,19 +212,20 @@ class DefaultCheck:
         elif file_format == 'hap':
             result["内置子包"].update({"state": 0, "message": "【鸿蒙包不进行判断内置子包】", "data": ""})
 
-        image_path_path = self.path_config[file_format]["image_path"]  # 默认1和许多卡片
+        # 判断内置呱呱卡资源
+        image_path_path = self.path_config[file_format]["image_path"]  # 默认呱呱卡路径
         if self.file_exists(self.path_cache + image_path_path):
             # 谷歌包不判断默认数据是否存在
             logging.debug("判断图片文件是否存在")
             image_png = self.count_files(self.path_cache + image_path_path, "png")  # 判断默认图片是否存在
             mp3_count = self.count_files(self.path_cache + image_path_path, "mp3")
-            i_m_list = os.listdir(self.path_cache + image_path_path) if os.listdir(
+            image_mp3_list = os.listdir(self.path_cache + image_path_path) if os.listdir(
                 self.path_cache + image_path_path) else []
             state, message = -1, "【未知错误】"
             if image_png >= 0 and mp3_count >= 0:
                 state, message = 0, ""
                 if default_game:
-                    for f in i_m_list:
+                    for f in image_mp3_list:
                         if (f.endswith('.png') or f.endswith('.mp3')) and default_game not in f:
                             state, message = -1, "【图片名称与内置包名不符】"
 
@@ -228,7 +233,7 @@ class DefaultCheck:
                 state, message = -1, "【音频或内置图片不存在】"
 
             result["内置图片"].update(
-                {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": i_m_list}], "state": state,
+                {"data": [{"图片数量": image_png, "音频数量": mp3_count, "文件列表": image_mp3_list}], "state": state,
                  "message": message})
 
         logging.debug("编辑结果")
@@ -243,7 +248,7 @@ class DefaultCheck:
 
 class DateCheck:
     @staticmethod
-    def package_config_check(data, is_lang=False):
+    def package_config_check(data):
         """判断默认数据是否正常"""
         package_config_check_result = []
         for level in data["areaData"]:
