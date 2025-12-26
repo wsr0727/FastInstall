@@ -28,6 +28,7 @@ header_config = {
                  "安卓": {"PlatForm": "11", "PlatForm2": "1", "OSType": "2", "CHCode": "A001", "AppCHCode": "A001"},
                  "iPad": {"PlatForm": "2", "PlatForm2": "1", "OSType": "1", "CHCode": "B002", "AppCHCode": "B002"},
                  "安卓平板": {"PlatForm": "12", "PlatForm2": "2", "OSType": "2", "CHCode": "A001", "AppCHCode": "A001"},
+                 "鸿蒙": {"PlatForm": "80", "PlatForm2": "14", "OSType": "6", "CHCode": "E023", "AppCHCode": "E023"},
                  "谷歌": {"PlatForm": "60", "PlatForm2": "3", "OSType": "2", "CHCode": "A005", "AppCHCode": "A005"}
                  },
     "country": {"中国大陆": {"Country": "CN"},
@@ -104,18 +105,18 @@ header_config = {
                  "印度尼西亚语": {"Lang": "id"}
                  },  # TODO 语言参数要换
     "version": {"VerID": "12030104"}
+
 }
 
 host_config = {"正式线": {"matrixdataapi": "https://matrixdataapi.babybus.com",
-                       "packagedataapi": "https://packagedataapi.babybus.com",
-                       "manage": "https://manage.mm.babybus.com"
-                       },
+                          "packagedataapi": "https://packagedataapi.babybus.com",
+                          "manage": "https://manage.mm.babybus.com"
+                          },
                "测试线": {"matrixdataapi": "https://matrixdataapi.development.platform.babybus.com",
-                       "packagedataapi": "https://packagedataapi.development.platform.babybus.com",
-                       "manage": "https://manage.tm.babybus.com"
-                       }
+                          "packagedataapi": "https://packagedataapi.development.platform.babybus.com",
+                          "manage": "https://manage.tm.babybus.com"
+                          }
                }
-
 
 path_config = {"首页": "/BabyMind/PageCenter/PageData",
                "非首页": "/PageCenter/PageData",
@@ -162,16 +163,17 @@ query_config = {"base": ["AcceptVerID=1", "EncryptType=4", "geVerID=1000000"],
 
 args_common = {
     "思维正式": {"安卓-简体": {"platform": "安卓", "version": "", "language": "简体", "environment": "正式线",
-                       "country": "中国大陆"},
-             "谷歌-英语": {"platform": "谷歌", "version": "", "language": "英语", "environment": "正式线",
-                       "country": "美国"},
-             "苹果-简体": {"platform": "iPhone", "version": "", "language": "简体", "environment": "正式线",
-                       "country": "中国大陆"},
-             "苹果-英语": {"platform": "iPhone", "version": "", "language": "英语", "environment": "正式线",
-                       "country": "美国"}
-             }
+                               "country": "中国大陆"},
+                 "谷歌-英语": {"platform": "谷歌", "version": "", "language": "英语", "environment": "正式线",
+                               "country": "美国"},
+                 "苹果-简体": {"platform": "iPhone", "version": "", "language": "简体", "environment": "正式线",
+                               "country": "中国大陆"},
+                 "苹果-英语": {"platform": "iPhone", "version": "", "language": "英语", "environment": "正式线",
+                               "country": "美国"},
+                 "鸿蒙-简体": {"platform": "鸿蒙", "version": "", "language": "简体", "environment": "正式线",
+                               "country": "中国大陆"}
+                 }
 }
-
 
 
 def aes_decrypt(cipher_text):
@@ -457,7 +459,7 @@ class PageData:
         :return  result:年龄配置二位数组
         """
         # 初始化结果数组
-        result = np.empty((0, 7))
+        result = np.empty((0, 8))
         class_id = {"2": "入园准备", "3": "小班", "4": "中班", "5": "大班", "6": "一年级", "7": "二年级"}
         # 提取 areaName, stageSort, ageTag, age, coreAge 和 title
         area_data = self.page_data.get('data', {}).get('areaData', [])
@@ -478,12 +480,14 @@ class PageData:
 
                 package_ident = tab['data'][0]['fieldData']['packageIdent'] if tab['data'] else ""  # 子包的唯一标识，取首个分包的唯一标识
 
+                total_stage = sum(int(item["fieldData"]["totalStage"]) for item in tab['data'])  # 总关卡数
+
                 age_tag = tab['style']['fieldData'].get('ageTag', '')
                 age = tab['style']['fieldData'].get('age', '')
                 core_age = tab['style']['fieldData'].get('coreAge', '')
 
                 # 拼接成二维数组，顺序为 areaName, stage_sort, title, ageTag, age, coreAge
-                row = [area_name, stage_sort, title + is_free, package_ident, age_tag, age, core_age]
+                row = [area_name, stage_sort, title + is_free, package_ident, total_stage, age_tag, age, core_age]
                 result = np.append(result, [row], axis=0)
         return result
 

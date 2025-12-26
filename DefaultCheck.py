@@ -253,18 +253,27 @@ class DateCheck:
         package_config_check_result = []
         for level in data["areaData"]:
             error_list = []
+            free_course = []
             level_name = level["style"]["fieldData"]["level"]
             level_name = "测验卷-" + level_name if level["moduleCode"] == "ExamArea" else level_name
 
             if level["moduleCode"] == "UnitCourse":
                 # 二年级为3层数据结构比较特殊，单独处理
                 level_counter = len(level["areaTab"])
+                for tab in level["areaTab"]:
+                    for course in tab["data"]:
+                        if course["fieldData"].get("isFree", False):
+                            free_course.append(course["title"])
             else:
                 level_counter = len(level["data"])
+                for course in level["data"]:
+                    if course["fieldData"].get("isFree", False):
+                        free_course.append(course["title"])
 
             package_config_check_result.append({
                 "level": level_name,
                 "count": level_counter,
+                "free_course": free_course,
                 "error": error_list
             })
 
