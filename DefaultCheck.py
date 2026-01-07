@@ -258,7 +258,7 @@ class DateCheck:
             level_name = "测验卷-" + level_name if level["moduleCode"] == "ExamArea" else level_name
 
             if level["moduleCode"] == "UnitCourse":
-                # 二年级为3层数据结构比较特殊，单独处理
+                # 一、二年级为3层数据结构比较特殊，单独处理
                 level_counter = len(level["areaTab"])
                 for tab in level["areaTab"]:
                     for course in tab["data"]:

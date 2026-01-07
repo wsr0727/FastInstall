@@ -109,7 +109,7 @@ header_config = {
 }
 
 host_config = {"正式线": {"matrixdataapi": "https://matrixdataapi.babybus.com",
-                          "packagedataapi": "https://packagedataapi.babybus.com",
+                          "packagedataapi": "http://packagedataapi.babybus.com",
                           "manage": "https://manage.mm.babybus.com"
                           },
                "测试线": {"matrixdataapi": "https://matrixdataapi.development.platform.babybus.com",

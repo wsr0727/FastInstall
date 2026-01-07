@@ -422,7 +422,7 @@ class InstallApp:
             return
         self.input_CaptchaNo_label.config(text="发送中...")
         text = self.input_histroy.item(cur_item)['text']
-        host = "https://udb.babybus.com" if not domain_name == "test" else "https://udb.development.platform.babybus.com"
+        host = "http://udb.babybus.com" if not domain_name == "test" else "http://udb.development.platform.babybus.com"
         url = host + "/AppSync/GetPhoneCaptcha?Phone=" + text + "&AccountGroupID=1"
 
         try:
