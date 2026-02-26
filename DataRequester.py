@@ -479,8 +479,7 @@ class PageData:
                 is_free = f"\n(试玩{tab['data'][0]['fieldData'].get('freeStage', 0)}关)" if not is_pay else ""  # 获取免费子包试玩关卡
 
                 package_ident = tab['data'][0]['fieldData']['packageIdent'] if tab['data'] else ""  # 子包的唯一标识，取首个分包的唯一标识
-
-                total_stage = sum(int(item["fieldData"]["totalStage"]) for item in tab['data'])  # 总关卡数
+                total_stage = sum(int(item["fieldData"].get("totalStage", 0)) for item in tab['data'])  # 总关卡数
 
                 age_tag = tab['style']['fieldData'].get('ageTag', '')
                 age = tab['style']['fieldData'].get('age', '')
