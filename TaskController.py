@@ -81,7 +81,7 @@ def get_file_name_info(file_name):
     :param file_name: 文件名
     :return: 包名 {"app_key": i}、版本{"version": version}，识别不到返回{}
     """
-    file_name_str = file_name.split('-')
+    file_name_str = file_name.split('-') if '-' in file_name else file_name.split('_')
     pattern = r'^[0-9]+\.[0-9]+\.[0-9]+\.?[0-9]+'  # 适配iOS和安卓不同的版本号
     result = {}
     for i in file_name_str:

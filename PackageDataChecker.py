@@ -4,12 +4,13 @@ from DataRequester import header_config, DataRequester, CheckPackageData, PageDa
 from FrameUI import *
 
 
+# 打包指令 pyinstaller -F -w PackageDataChecker.py
 class PackageDataChecker:
     def __init__(self, data_check_window):
         self.data_check_window = data_check_window
-        self.data_check_window.title("数据核验工具 1.00.02")
-        self.width = 600
-        self.height = 300
+        self.data_check_window.title("数据核验工具 1.00.03")
+        self.width = 550
+        self.height = 230
         self.data_check_window.geometry(str(self.width) + 'x' + str(self.height))
 
         self.packagedata_frame = LabelFrame(self.data_check_window)
@@ -45,16 +46,15 @@ class PackageDataChecker:
         self.ident_var = StringVar()
         self.ident_entry = Entry(self.packagedata_frame, textvariable=self.ident_var, width=20)
 
-        self.packagedata_button = Button(self.packagedata_frame, text="获取", width=8,
+        self.button_frame = LabelFrame(self.packagedata_frame, text="选择需要获取的数据")
+        self.packagedata_button = Button(self.button_frame, text="子包数据", width=20,
                                          command=self.package_data_request)
-        self.expanddata_button = Button(self.packagedata_frame, text="获取脑力开发页面数据配置", width=20,
+        self.expanddata_button = Button(self.button_frame, text="脑力开发数据", width=20,
                                         command=self.expand_data_config)
-
-        self.allpackagedata_frame = LabelFrame(self.packagedata_frame, text="【获取13国语言全部资源】")
-        self.alllangpackagedata_button = Button(self.allpackagedata_frame, text="子包", width=20,
+        self.alllangpackagedata_button = Button(self.button_frame, text="子包数据（全语言）", width=20,
                                                 command=self.all_lang_package_data)
-        self.attention_label = Label(self.allpackagedata_frame,
-                                     text="注意：【获取13国语言全部资源】无需选择语言和资源，输出给定子包标识x2、x4下13国语言MD5信息")
+        # self.attention_label = Label(self.allpackagedata_frame,
+        #                              text="注意：【获取13国语言全部资源】无需选择语言和资源，输出给定子包标识x2、x4下13国语言MD5信息")
 
         self.packagedata_frame.grid(row=0, column=0, sticky="N", padx=10, pady=10)
 
@@ -72,11 +72,12 @@ class PackageDataChecker:
         self.environment.grid(row=2, column=3, padx=5)
         self.package_ident.grid(row=3, column=0)
         self.ident_entry.grid(row=3, column=1, padx=2, pady=5)
-        self.packagedata_button.grid(row=4, column=0, columnspan=3)
-        self.expanddata_button.grid(row=4, column=3)
-        self.allpackagedata_frame.grid(row=5, column=0, columnspan=4, sticky="N", padx=5, pady=10)
-        self.alllangpackagedata_button.grid(row=5, column=0)
-        self.attention_label.grid(row=6, column=0, columnspan=4)
+
+        self.button_frame.grid(row=5, column=0, columnspan=4, sticky="N", padx=5, pady=10)
+        self.packagedata_button.grid(row=5, column=0)
+        self.alllangpackagedata_button.grid(row=5, column=1)
+        self.expanddata_button.grid(row=5, column=2)
+        # self.attention_label.grid(row=6, column=0, columnspan=4)
 
     # 获取 data_check_window 对象
     def get_data_check_window(self):
@@ -121,13 +122,14 @@ class PackageDataChecker:
         environment = self.environment.get()
         language = self.language.get()
         country = self.country.get()
+        ident_value = self.ident_entry.get()
         # 检查版本号和子包标识是否为空
         if not version:
             messagebox.showinfo("查询失败 ", "请输入版本号", parent=self.data_check_window)
             return
         # 创建数据请求对象
         data_requester = DataRequester(platform, version, language, environment, country)
-        result = PageData(data_requester.page_data("脑力开发")).get_age_config_by_expanddata()
+        result = PageData(data_requester.page_data("脑力开发")).get_age_config_by_expanddata(ident_value)
         title = platform + "_" + version + "版本_" + environment + "_" + language + "_" + country + "_" + "脑力开发页面年龄配置"
         output_result(result, expand_age_headers, title)
 

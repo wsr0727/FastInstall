@@ -43,7 +43,7 @@ class DefaultCheck:
         "hap": {"image_path": "",
                 "package_config_path": "/resources/rawfile/packData/",
                 "package_config_expand_path": "/resources/rawfile/packData/",
-                "default_game_path": "/assets/res/subModules/default_game.json"}
+                "default_game_path": "/resources/rawfile/res/subModules/default_game.json"}
     }
     # 解压目录，保存在相对路径
     path_cache = "/zip_cache_" + str(int(time.time()))
@@ -209,8 +209,6 @@ class DefaultCheck:
 
             result["内置子包"].update({"state": status, "message": message, "data": [
                 {"内置md5": default_game_md5_data["item"], "服务端md5": net_game_md5}]})
-        elif file_format == 'hap':
-            result["内置子包"].update({"state": 0, "message": "【鸿蒙包不进行判断内置子包】", "data": ""})
 
         # 判断内置呱呱卡资源
         image_path_path = self.path_config[file_format]["image_path"]  # 默认呱呱卡路径
@@ -258,7 +256,7 @@ class DateCheck:
             level_name = "测验卷-" + level_name if level["moduleCode"] == "ExamArea" else level_name
 
             if level["moduleCode"] == "UnitCourse":
-                # 一、二年级为3层数据结构比较特殊，单独处理
+                # 二年级为3层数据结构比较特殊，单独处理
                 level_counter = len(level["areaTab"])
                 for tab in level["areaTab"]:
                     for course in tab["data"]:

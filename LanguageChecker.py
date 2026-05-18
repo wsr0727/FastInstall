@@ -453,6 +453,24 @@ class LanguageChecker:
             game_lang_path = package_cache + "/Payload/2d_noSuper_education.app/res/subModules"
 
         self.insert_text(self.excel_log_text, "开始检测【游戏音频与差异表音频列表是否一致】", "标题")
+
+        if game_lang_path.endswith(".zip"):
+            self.insert_text(self.excel_log_text, f"=====单语言只核对【简体】=======", "标题")
+            game_lang_path = get_lang_path(package_cache)
+            audio_file_list = os.listdir(game_lang_path)
+            for file_name in audio_file_list:
+                # 获取游戏语音包文件音频，并比对在差异表中是否存在
+                file_name = file_name.replace(".mp3", "")
+                if file_name not in result_list:
+                    # 如果不存在才输出
+                    self.insert_text(self.excel_log_text, f"    游戏文件 '{file_name}'没有出现在表格里。", "失败")
+                else:
+                    result_list.remove(file_name)
+            if result_list:
+                self.insert_text(self.excel_log_text, f"\n表格内的这几个音频'{result_list}'没有出现在游戏里。或者表格存在重复数据", "失败")
+            shutil.rmtree(package_cache)
+            return
+
         for lang in language.keys():
             self.insert_text(self.excel_log_text, f"=====检测语言【{language[lang]}】=======", "标题")
             # 拼接子包内的音频路径

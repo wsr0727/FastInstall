@@ -156,7 +156,7 @@ query_config = {"base": ["AcceptVerID=1", "EncryptType=4", "geVerID=1000000"],
                 "脑力开发": ["resourceTypeCode=X2", "routeCode=Expand"],
                 "入园准备": ["resourceTypeCode=X2", "routeCode=School"],
                 "巩固练习": ["resourceTypeCode=X2", "routeCode=Train2"],
-                "加减专项": ["resourceTypeCode=X2", "routeCode=Arithmetic2"],
+                "加减专项": ["resourceTypeCode=X2", "routeCode=Arithmetic3"],
                 "思维视频": ["resourceTypeCode=X2", "routeCode=Video"],
                 "亲子互动": ["resourceTypeCode=X2", "routeCode=Interaction"]
                 }
@@ -453,16 +453,25 @@ class PageData:
     def __init__(self, page_data):
         self.page_data = page_data
 
-    def get_age_config_by_expanddata(self):
+    def get_age_config_by_expanddata(self, ident_value=""):
         """
         从脑力开发页面配置中获取年龄配置
-        :return  result:年龄配置二位数组
+        ident_value: 子包标识
+        :return 年龄配置二位数组
         """
         # 初始化结果数组
         result = np.empty((0, 8))
-        class_id = {"2": "入园准备", "3": "小班", "4": "中班", "5": "大班", "6": "一年级", "7": "二年级"}
+        class_id = {"0": "无", "2": "入园准备", "3": "小班", "4": "中班", "5": "大班", "6": "一年级", "7": "二年级"}
         # 提取 areaName, stageSort, ageTag, age, coreAge 和 title
         area_data = self.page_data.get('data', {}).get('areaData', [])
+
+        def age_to_str(agetab):
+            age_list = agetab.split(",")
+            age_name = []
+            for age in age_list:
+                age_name.append(class_id[age])
+            return "、".join(age_name)
+
         for area in area_data:
             area_name = area.get('areaName', '')  # 获取 areaName
 
@@ -474,20 +483,27 @@ class PageData:
             area_tabs = area.get('areaTab', [])
 
             for tab in area_tabs:
+                package_ident = tab['data'][0]['fieldData']['packageIdent'] if tab['data'] else ""  # 子包的唯一标识，取首个分包的唯一标识
+
+                # 如果存在ident_value，代表只过滤ident_value子包数据，所以package_ident不等于ident_value就直接跳过
+                if ident_value and ident_value != package_ident:
+                    continue
+
                 title = tab['areaTabName']
                 is_pay = tab['data'][0]['fieldData'].get('isPay', True) if tab['data'] else True  # 是否是付费子包
                 is_free = f"\n(试玩{tab['data'][0]['fieldData'].get('freeStage', 0)}关)" if not is_pay else ""  # 获取免费子包试玩关卡
 
-                package_ident = tab['data'][0]['fieldData']['packageIdent'] if tab['data'] else ""  # 子包的唯一标识，取首个分包的唯一标识
                 total_stage = sum(int(item["fieldData"].get("totalStage", 0)) for item in tab['data'])  # 总关卡数
 
-                age_tag = tab['style']['fieldData'].get('ageTag', '')
-                age = tab['style']['fieldData'].get('age', '')
-                core_age = tab['style']['fieldData'].get('coreAge', '')
+                age_tag = age_to_str(tab['style']['fieldData'].get('ageTag', ''))
+                age = age_to_str(tab['style']['fieldData'].get('age', ''))
+                core_age = age_to_str(tab['style']['fieldData'].get('coreAge', ''))
 
                 # 拼接成二维数组，顺序为 areaName, stage_sort, title, ageTag, age, coreAge
-                row = [area_name, stage_sort, title + is_free, package_ident, total_stage, age_tag, age, core_age]
+                row = [area_name, stage_sort, title + is_free, package_ident, total_stage, age_tag, age,
+                       core_age]
                 result = np.append(result, [row], axis=0)
+
         return result
 
 
