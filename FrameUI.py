@@ -54,10 +54,10 @@ def show_log(task):
 
     def level_conunt_text(count):
         for i in count:
-            insert_text("阶段-" + i["level"] + "：课程数量 " + str(i["count"]))
+            insert_text("阶段：" + i["level"] + "：课程数量 " + str(i["count"]))
             insert_text("体验课：" + str(i["free_course"]))
             if i["error"]:
-                insert_text("海外存在MV环节的课程：" + str(i["error"]))
+                insert_text("异常：" + str(i["error"]))
             insert_text("-" * 20, "标题")
 
     def expand_conunt_text(count):

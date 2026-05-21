@@ -249,11 +249,22 @@ class DateCheck:
     def package_config_check(data):
         """判断默认数据是否正常"""
         package_config_check_result = []
+        class_name = {
+            "1": "小班上", "2": "小班下", "3": "中班上", "4": "中班下",
+            "5": "大班上", "6": "大班下", "7": "入园准备", "8": "一年级上",
+            "9": "一年级下", "10": "二年级上"
+        }
+        exist_class = {}
         for level in data["areaData"]:
             error_list = []
             free_course = []
-            level_name = level["style"]["fieldData"]["level"]
-            level_name = "测验卷-" + level_name if level["moduleCode"] == "ExamArea" else level_name
+            level_data = level["style"]["fieldData"]["level"]
+
+            if level["moduleCode"] == "ExamArea":
+                level_name = "测验卷-" + class_name.get(level_data, "")
+            else:
+                level_name = class_name.get(level_data, "")
+                exist_class.update({level_data: level_name})
 
             if level["moduleCode"] == "UnitCourse":
                 # 二年级为3层数据结构比较特殊，单独处理
@@ -274,7 +285,15 @@ class DateCheck:
                 "free_course": free_course,
                 "error": error_list
             })
-
+        non_exist_class = class_name.keys() - exist_class.keys()
+        if non_exist_class:
+            for level in non_exist_class:
+                package_config_check_result.append({
+                    "level": class_name.get(level, ""),
+                    "count": 0,
+                    "free_course": [],
+                    "error": []
+                })
         return package_config_check_result
 
     @staticmethod
@@ -284,12 +303,12 @@ class DateCheck:
         for level in result:
             if level["count"] <= 0:
                 check -= 1
-                message += "【level" + level["level"] + "没有课程】"
+                message += "【阶段：" + level["level"] + "没有课程】"
 
             if level["error"]:
                 check -= 1
-                message += "【level" + level["level"] + "国际化下存在MV环节】"
-        if len(result) <= 3:
+                message += "【阶段：" + level["level"] + "国际化下存在MV环节】"
+        if len(result) <= 8:
             check -= 1
             message += "【只有" + str(len(result)) + "个level，检查数量】"
         state = -1 if check < 0 else 0
