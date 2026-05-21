@@ -260,6 +260,7 @@ class DateCheck:
             free_course = []
             level_data = level["style"]["fieldData"]["level"]
 
+            # 区分测验卷和阶段的名称
             if level["moduleCode"] == "ExamArea":
                 level_name = "测验卷-" + class_name.get(level_data, "")
             else:
@@ -285,6 +286,7 @@ class DateCheck:
                 "free_course": free_course,
                 "error": error_list
             })
+        # 缺少的阶段会设置为课程数量为0，并加入结果
         non_exist_class = class_name.keys() - exist_class.keys()
         if non_exist_class:
             for level in non_exist_class:

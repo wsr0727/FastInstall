@@ -31,7 +31,7 @@ class LogViewer:
 
         # IP地址输入框
         self.ip_var = StringVar()
-        self.ip_var.set("10.8.26.222")
+        self.ip_var.set("10.8.29.138")
         self.ip = Entry(self.log_proxy_frame, textvariable=self.ip_var, width=11)
         self.ip.grid(row=0, column=1)
 
@@ -41,7 +41,7 @@ class LogViewer:
 
         # 设置ip端口
         self.ip_port_var = StringVar()
-        self.ip_port_var.set("8888")
+        self.ip_port_var.set("7777")
         self.ip = Entry(self.log_proxy_frame, textvariable=self.ip_port_var, width=5)
         self.ip.grid(row=0, column=3)
 
@@ -139,7 +139,9 @@ class LogViewer:
         # 创建滚动文本区域用于显示日志
         self.log_text = scrolledtext.ScrolledText(self.log_view_frame, width=157, height=34,
                                                   font=('Microsoft YaHei', 10))
+
         self.log_text.grid(row=3, column=0)
+
 
         # 监视
         self.log_text.bind('<MouseWheel>', self.on_mouse_scroll)
@@ -147,9 +149,11 @@ class LogViewer:
 
     def start_logging(self):
         """启动日志获取线程"""
-        if not self.logging_switch:  # 如果当前没有进行日志获取，则开始新的线程
-            self.logging_switch = True
-            threading.Thread(target=self.run, daemon=True).start()
+        if self.logging_switch:  # 如果已经在运行，先停止
+            self.logging_switch = False
+            time.sleep(1)  # 等待线程结束
+        self.logging_switch = True
+        threading.Thread(target=self.run, daemon=True).start()
 
     def stop_logging(self):
         """停止日志获取"""
@@ -160,20 +164,24 @@ class LogViewer:
         self.log_list = collections.deque([])  # 清除列表
         self.log_text.delete(1.0, END)
 
-
     def run(self):
         """获取日志的方法"""
         ip_address = self.ip_var.get()
         ip_port = self.ip_port_var.get()
         full_address = f"{ip_address}:{ip_port}"  # 连接IP与端口
+        self.timeStamp = int(time.time() * 1000)  # 设置为当前时间戳，单位为毫秒
+        last_processed_time = self.timeStamp  # 记录上次处理的时间戳
+
         while self.logging_switch:
             log_list = self.get_log(full_address)
             if log_list == -1:
                 self.log_to_text(time.strftime("%Y-%m-%d %H:%M:%S") + " 【异常】应用未启动，或日志开关未开启")
             else:
                 for log_entry in reversed(log_list):  # 倒序读取日志列表
-                    self.print_log(log_entry)
-                    self.timeStamp = log_entry.get("timeStamp", self.timeStamp)
+                    log_time = log_entry.get("timeStamp")  # 获取当前日志的时间戳
+                    if log_time > last_processed_time:  # 只处理新日志
+                        self.print_log(log_entry)
+                        last_processed_time = log_time  # 更新最后处理的时间戳
                 if self.auto_scroll:
                     self.log_text.yview(tk.END)  # 自动滚动到底部
             time.sleep(1)  # 暂停一秒
@@ -302,6 +310,8 @@ class LogViewer:
             else:
                 self.current_result_index = -1  # 表示没有结果
                 self.result_count_label.config(text="未找到结果")
+            # time.sleep(1)
+            # self.highlight_keyword()
 
     def show_next(self):
         """显示下一个搜索结果"""
