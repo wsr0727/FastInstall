@@ -10,6 +10,8 @@ from TaskController import *
 from Glob import *
 from LanguageChecker import show_lang_window
 from PackageDataChecker import show_data_check_window
+from HDC_Command import show_hdc_window
+from DoKitLogger import show_ios_window
 import requests
 import json
 
@@ -19,18 +21,19 @@ import json
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s-%(levelname)s: [%(funcName)s] %(message)s')
 # 打包指令 pyinstaller -F -w FastInstall.py
 
-app_key, input_list, app_key_histroy, ip_history = get_cache()  # 初始化缓存
+app_key, input_list, app_key_histroy, ip_history,ip_port_history = get_cache()  # 初始化缓存
 glob.set_gl_input_list(input_list)
 glob.set_gl_app_key(app_key)
 glob.set_gl_app_key_histroy(app_key_histroy)
 glob.set_gl_ip_history(ip_history)
+glob.set_gl_ip_port_history(ip_port_history)
 
 
 # ---界面UI-----------------------------------------------
 class InstallApp:
     def __init__(self, init_window_name):
         self.init_window_name = init_window_name
-        self.init_window_name.title("超好用的测试工具  3.00.19")
+        self.init_window_name.title("超好用的测试工具  3.00.20")
         self.width = 1000
         # self.height = 520
         self.height = 530  # 加上”更多“按钮的高度
@@ -45,6 +48,10 @@ class InstallApp:
         self.tools_menu.add_command(label="国际化音频校验", command=show_lang_window)
         self.tools_menu.add_separator()
         self.tools_menu.add_command(label="数据核验工具", command=show_data_check_window)
+        self.tools_menu.add_separator()
+        self.tools_menu.add_command(label="鸿蒙测试工具", command=lambda: show_hdc_window(self.init_window_name))
+        self.tools_menu.add_separator()
+        self.tools_menu.add_command(label="iOS测试工具", command=lambda: show_ios_window(self.init_window_name))
         self.tools_menu.add_separator()
         self.menubar.add_cascade(label="工具箱", menu=self.tools_menu)
         self.init_window_name.config(menu=self.menubar)

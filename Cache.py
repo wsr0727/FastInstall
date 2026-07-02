@@ -25,6 +25,7 @@ def config_set(key_value):
         [cache]
         input_histroy = []
         ip_history = []
+        ip_port_history = {}
         """
 
         with open(config_path, "w") as f:
@@ -61,6 +62,7 @@ def get_cache():
     default_app_key_history = []
     default_input_history = []
     default_ip_history = []
+    default_ip_port_history = {}
 
     cfg = configparser.ConfigParser()
 
@@ -68,15 +70,21 @@ def get_cache():
         cfg.read(config_path)
     else:
         # 如果配置文件不存在，返回默认值
-        return default_app_key, default_input_history, default_app_key_history, default_ip_history
+        return default_app_key, default_input_history, default_app_key_history, default_ip_history,default_ip_port_history
 
     # 获取缓存
     app_key_get = cfg.get("app", "app_key", fallback=default_app_key)
     app_key_histroy_get = cfg.get("app", "app_key_histroy", fallback=str(default_app_key_history))
     input_histroy = cfg.get("cache", "input_histroy", fallback=str(default_input_history))
     ip_history = cfg.get("cache", "ip_history", fallback=str(default_ip_history))
+    ip_port_history = cfg.get("cache", "ip_port_history", fallback=str(default_ip_port_history))
 
-    return app_key_get, ast.literal_eval(input_histroy), ast.literal_eval(app_key_histroy_get), ast.literal_eval(
-        ip_history)
+    return (
+        app_key_get,
+        ast.literal_eval(input_histroy),
+        ast.literal_eval(app_key_histroy_get),
+        ast.literal_eval(ip_history),
+        ast.literal_eval(ip_port_history)
+    )
 
 # app_key, input_list, app_key_histroy = cache_set()  # 初始化缓存

@@ -6,6 +6,7 @@ class Glob:
         self.gl_input_list = []
         self.gl_task_list = []
         self.gl_ip_history = []
+        self.gl_ip_port_history = {}
 
     def set_gl_devices(self, value):
         self.gl_devices = value
@@ -43,6 +44,12 @@ class Glob:
     def get_gl_ip_history(self):
         return self.gl_ip_history
 
+    def set_gl_ip_port_history(self, value):
+        self.gl_ip_port_history = value
+
+    def get_gl_ip_port_history(self):
+        return self.gl_ip_port_history
+
+
 
 glob = Glob()
-
